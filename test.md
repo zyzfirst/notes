@@ -15,5 +15,7 @@ enter code here
 
 **Ctrl + B 加粗**
 
+切换视图
 
+Ctrl + 方向键
 
