@@ -19,3 +19,7 @@ enter code here
 
 Ctrl + 方向键
 
+[Ctrl + L 超链接][1]
+
+
+  [1]: https://www.baidu.com/
