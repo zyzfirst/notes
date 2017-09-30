@@ -4,3 +4,7 @@ tags: 新建,模板,小书匠
 grammar_cjkRuby: true
 ---
 # lunix
+1.cat:只会看到最后一屏,
+2.more: 可以显示百分比,回车下一行,空格下一页
+3.less上下分页
+4.tail: tail -10 /etc/sudo.conf 查看后10行
