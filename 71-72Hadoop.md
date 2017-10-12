@@ -90,7 +90,7 @@ ssh slaver1
 ssh slaver2
 能正确跳转到两台子节点的操作界面即可，同样在每个子节点通过相同的方式登录主节点和其他子节点也能无密码正常登录就表示配置成功。
 5. 原理解析
-![enter description here][1]
+![][1]
 
 
  >安门的过程就是将公钥追加到authorized_keys中的过程,所以达到3的最终目的就能实现各个节点免密登录
@@ -126,7 +126,7 @@ source /etc/profile
 ### 5. 配置hadoop
 
 >1. 首先前提是几个节点已经能相互ping通,并且免密登录,然后需要配置一下
->2. ![enter description here][2]
+>2. ![][2]
 
 
   >3. 配置core-site.xml
@@ -250,7 +250,7 @@ slaver2
 master
 配置mastr,那么主节点即是namenode也是datanode,进程会多出两个nodemanager和datanode,以及自身的resourcemanager,namenode,sencond(监督) 和同游的jps
 >8. 小结
- ![enter description here][3]
+ ![][3]
 
 
   ### 6.配置分节点
@@ -295,7 +295,7 @@ source /etc/profile
 3.elk,impala,rabbitMQ,kylin,oracle,shell语言,r语言,kettle,redis,solr,flink,druid框架
 4.爬虫就是发送http请求,得到html得到数据建立索引储存.搜索引擎nutch(技术框架)
 5.nutch 演化出来:hadoop  lucene全文检索 solr和elasticsearch  序列化avro(hadoop本身的框架)
-![enter description here][4]
+![][4]
 6.分布式的应用层场景:大数据常规机器满足不了,高并发 单节点单服务器满足不了
 7.分布式:通过网络把多台机器联系起来,多台机器通过信息系统通信,以一个整体对外提供同意的服务,有两项技术,一个是序列化,是用来通信,以流的形式,多台机器的通信,另一个通信需要协议IPC协议包括LPC(本地过程调用)RPC(远程过程调用)
 8.Mahout把数学公式封装成函数,传参数即可,用来做一些分析
