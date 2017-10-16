@@ -206,10 +206,13 @@ public static class MapreduceTestReduce extends Reducer<Text, IntWritable, Text,
 
 ![][9]
 
-### 实现功能
+### 实现功能:统计用户访问量
 
 >1. 单词出现的次数,即上边贴出的代码,主要是接收map的value累加,存到新的value中
 >2. 统计用户登录的次数,加一个判断
+>3.IntWritable=1,可以保证reduce和combiner的逻辑和内容相同,reduce可以直接作为combiner在map上进行聚合减少reduce的工作量,因为map是分布式的,而reduce个数少,尽量做少的工作.
+
+#### map
 
 ``` stylus
 public static class UserVisitTimesMap extends Mapper<LongWritable, Text, Text, IntWritable>{
@@ -228,6 +231,279 @@ public static class UserVisitTimesMap extends Mapper<LongWritable, Text, Text, I
 		}
 	}
 ```
+#### reduce
+
+``` stylus
+public static class UserVisitTimesReduce extends Reducer<Text, IntWritable,IntWritable,Text>{
+
+		private int sum;
+		private IntWritable oValue = new IntWritable(0);
+		@Override
+		protected void reduce(Text key, Iterable<IntWritable> values,
+				Reducer<Text, IntWritable, IntWritable, Text>.Context context) throws IOException, InterruptedException {
+			sum = 0;
+			for (IntWritable value : values) {
+				sum += value.get();
+			}
+			oValue.set(sum);
+			context.write(oValue,key);
+		}
+		
+}
+```
+### inputformat方式,读取源文件,需要指定源文件的地址fileinputformat.addInputPath(job, path);,然后由几种读取方式
+
+>Textfileinputformat,这种是默认的生成的kv对格式是()longwriable,text)key是首字符在全文中的偏移量,value是一整行内容
+
+>keyvaluefileinputformat,会把文本读成kv对,默认分隔符是"\t",如果有则分为两部分,前边是key,如果不存在,则一整行都是key,value为空,并且传给map的数据格式是Text,Text
+
+>sequencefileinputformat,读的源文件,必须是sequenceoutputformat生成的文件,它读取数据会保留数据格式,那么就可以随意的定义读取的格式,不用因为key ,value的限制,而去重写好多方法
+
+### 全排序和倒序排序
+
+#### 抽样 和 分区
+>定义抽样方式和数量,创建抽样数据的储存地址,把抽样规则加到job中,在job启动之前完成抽样并存储,最后把抽样的数据加到缓存中
+>设置分区器,为TotalOrderPartitioner.class,设置分区规则为TotalOrderPartitioner.setPartitionFile(configuration, partitionfile);根据抽样文件进行分区,默认是hash,随机分配,即%reduce的数量
+
+#### 代码实现,主要是设置规则,不用自己重写方法,若是倒序排序的话,需要重写比较规则,在此处都是直接用的框架自带的已经定义好的抽样或是分区方法,只是配置了一下规则,同样可以完全自定义,因为可能要实现其他的reader方法,比较麻烦,所以使用sequenceinputformat和totalorderPartition.
+
+``` stylus
+public static void main(String[] args) throws Exception {
+		Configuration configuration = new Configuration();
+		FileSystem hdfsFileSystem = FileSystem.get(configuration);
+		
+		//定义抽样,方式(用sequce读,必须和上次的输出格式一样,因为它会保留读取到数据的格式)和数量
+		InputSampler.Sampler<IntWritable, Text> sampler = new InputSampler.RandomSampler<>(0.8, 5);
+		//设置分区文件的路径,抽样的结果写到文件
+		Path partitionfile = new Path("/bd76/total2/partition");
+		hdfsFileSystem.delete(partitionfile, true);
+		//设置后全排序的partition程序就会读取这个分区文件来完成按顺序进行分区???默认是hash
+		TotalOrderPartitioner.setPartitionFile(configuration, partitionfile);
+		
+		//设置job
+		Job job = Job.getInstance(configuration);
+		job.setJarByClass(TotalSort.class);
+		job.setMapperClass(Mapper.class);
+		job.setReducerClass(TotalSortReduce.class);
+		job.setJobName("全排序");
+		job.setMapOutputKeyClass(IntWritable.class);
+		job.setMapOutputValueClass(Text.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(IntWritable.class);
+		
+		
+		//把分区文件加入分布式的缓存中????
+		//设置分区器,默认是hashpartition
+		job.setPartitionerClass(TotalOrderPartitioner.class);
+		job.addCacheFile(partitionfile.toUri());
+		//设置reduce节点个数,默认是1
+		job.setNumReduceTasks(2);
+		
+		//如果是倒叙排序,那么指定job的sortcompare方法
+		job.setSortComparatorClass(WritableDesx.class);
+		
+		Path path = new Path("/bd23/login/data");
+		Path path2 = new Path("/bd76/total/result");
+		hdfsFileSystem.delete(path2,true);
+		//keyvalueinputformat map的输入会把文本文件读取成kv对,按照分隔符把一行分成两部分
+		//前面key,后面value,如果分隔符不存在正行都是key,value为空,默认分隔符\t,
+		//手动指定分隔符参数:mapreduce.input.keyvalueinerecordreader.key.value.separator
+		//
+		job.setInputFormatClass(SequenceFileInputFormat.class);
+		//设置输出文件为sequencefile
+		//job.setOutputFormatClass(SequenceFileOutputFormat.class);
+		FileInputFormat.addInputPath(job, path);
+		FileOutputFormat.setOutputPath(job, path2);
+		
+		//将随机抽样写入文件,在job启动之前启动抽样程序,并将抽样排序取出的中值写入文件,分布式抽样
+		InputSampler.writePartitionFile(job, sampler);
+		
+		//启动job
+		System.exit(job.waitForCompletion(true)?0:1);
+		
+	}
+```
+>全倒序排序,job.setSortComparatorClass(WritableDesx.class);自定义的比较器,实现intwriable.comparator,是按照key倒序,只重写compare方法即可
+
+``` stylus
+//设置key的比较规则,是相反的即是倒序排序,默认是从小到大
+	public static class WritableDesx extends IntWritable.Comparator{
+
+		@Override
+		public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
+			return -super.compare(b1, s1, l1, b2, s2, l2);
+		}
+		
+	}
+```
+### 二次排序的功能实现:1. 首先自定义封装对象的类型和自定义排序规则(重写compareTo方法,比较第一个字段再比较第二个字段)  2. 自定义分区规则,默认是hash,继承一下Partitioner类,重写getPartition方法,即可自行分区,返回的是reduce的标号   3.定义map把两个字段加到自定义封装对象中区,作为key,使用自定义的排序规则    4.定义reduce,把kv的值转换一下,需要遍历,因为可能是45 44 lisan,wangwu 需要写进去两次,不遍历会漏掉    5.创建job,set条件运行,不同的是 设置inpuformat方式为keyvalueinputformat,因为读取的源文件正好符合这种方式就分为两部分,所以使用这个     另外设置分区规则setPartitionerClass即自定义的规则
+>1.
+``` stylus
+//自定义封装对象的类型,封装二次排序的第一个地段和第二个字段
+	//自定义排序规则,第一个字段不同按照第一个排序,第一个相同按照第二个排序
+	public static class TwoFiles implements WritableComparable<TwoFiles>{
+        private String firstFiled;
+        private int secondfiled;
+        
+		
+		public String getFirstFiled() {
+			return firstFiled;
+		}
+		public void setFirstFiled(String firstFiled) {
+			this.firstFiled = firstFiled;
+		}
+		public int getSecondfiled() {
+			return secondfiled;
+		}
+		public void setSecondfiled(int secondfiled) {
+			this.secondfiled = secondfiled;
+		}
+		//序列化
+		@Override
+		public void write(DataOutput out) throws IOException {
+			out.writeUTF(firstFiled);
+			out.writeInt(secondfiled);
+		}
+        //反序列化
+		@Override
+		public void readFields(DataInput in) throws IOException {
+			this.firstFiled = in.readUTF();
+			this.secondfiled = in.readInt();
+		}
+        //比较方法
+		//先比较第一个字段,若相等,再比较第二个字段
+		@Override
+		public int compareTo(TwoFiles o) {
+			if(this.firstFiled.equals(o.firstFiled)){
+				return this.secondfiled-o.secondfiled;
+			}else{
+				return this.firstFiled.compareTo(o.firstFiled);
+			}
+		}
+	}
+```
+>2.
+
+``` stylus
+//自定义分区,用来将第一个字段相同的key值分区到同一个reduce节点上
+	public static class TwoFilesPartitioner extends Partitioner<TwoFiles, NullWritable>{
+
+		//返回值是一个int数字,这个数组是reduce的标号,numPartitions是reduce的个数
+		@Override
+		public int getPartition(TwoFiles key, NullWritable value, int numPartitions) {
+		// (key.firstFiled.hashCode()&Integer.MAX_VALUE)得到正值
+			int reduceNo = (key.firstFiled.hashCode()&Integer.MAX_VALUE)%numPartitions;
+			return reduceNo;
+		}
+		
+	}
+```
+![][10]
+
+>3.
+
+``` stylus
+//定义map
+	public static class SecondSortMap extends Mapper<Text, Text, TwoFiles, NullWritable>{
+
+		private final NullWritable oValue = NullWritable.get();
+		@Override
+		protected void map(Text key, Text value, Mapper<Text, Text, TwoFiles, NullWritable>.Context context)
+				throws IOException, InterruptedException {
+			TwoFiles twoFiles = new TwoFiles();
+			//将两个字段中的内容封装到对象中,把对象作为key传递到reduce
+			twoFiles.setFirstFiled(key.toString());
+			twoFiles.setSecondfiled(Integer.valueOf(value.toString()));
+		    context.write(twoFiles, oValue);
+		}
+		
+	}
+```
+>4.
+
+``` stylus
+//定义reduce
+	public static class SecondSorReduce extends Reducer<TwoFiles, NullWritable, Text, Text>{
+
+		private Text oKey = new Text();
+		private Text oValue = new Text();
+		
+		@Override
+		protected void reduce(TwoFiles key, Iterable<NullWritable> values,
+				Reducer<TwoFiles, NullWritable, Text, Text>.Context context) throws IOException, InterruptedException {
+			//若两个key一样,value虽然为空,那么也是由数量的是2,那么for循环,会将两个都加进去,不循环,会少
+			//NullWritable 也可以计算次数,不过自身为空
+			for (NullWritable value : values) {
+				oKey.set(key.firstFiled);
+				oValue.set(String.valueOf(key.secondfiled));
+				context.write(oKey, oValue);
+			}
+			oKey.set("-------");
+			oValue.set("");
+			context.write(oKey, oValue);
+		}
+   }
+```
+>5.
+
+``` stylus
+//定义job
+	public static void main(String[] args) throws Exception {
+		Configuration configuration = new Configuration();
+		Job job = Job.getInstance(configuration);
+		job.setJarByClass(SecondSort.class);
+		job.setMapperClass(SecondSortMap.class);
+		job.setReducerClass(SecondSorReduce.class);
+		job.setMapOutputKeyClass(TwoFiles.class);
+		job.setMapOutputValueClass(NullWritable.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(Text.class);
+		job.setJobName("二次排序");
+		//job.setNumReduceTasks(2);
+		Path path = new Path("/secondaryorder");
+		Path path2 = new Path("/bd76/secondTwo");
+		FileSystem.get(configuration).delete(path2, true);
+		FileInputFormat.addInputPath(job, path);
+		FileOutputFormat.setOutputPath(job, path2);
+		//把文件内容以kv的形式读取出来发送给map
+		job.setInputFormatClass(KeyValueTextInputFormat.class);
+		job.setPartitionerClass(TwoFilesPartitioner.class);
+		
+		//设置分组比较器
+		job.setGroupingComparatorClass(GroupToReduceCompare.class);
+		
+		System.exit(job.waitForCompletion(true)?0:1);
+	}
+```
+#### 相同的key执行完后统一加"---",即保证相同的key,处理一套逻辑,那么需要让相同的key调用一个reduce方法,那么需要自定义分组比较器,继承wriableCompare,然后再job.setGroupingComparatorClass(GroupToReduceCompare.class);,设置自己的分组比较器
+
+``` stylus
+//定义分组比较器,不同的key,只要第一个字段相同,就调用一个reduce方法,目的是相同的key,
+	//执行相同的代码或是对相同的key进行相同的操作或是统一 的操作,如key完后加"---"
+	public static class GroupToReduceCompare extends WritableComparator{
+        //构造方法里面要先向父类传递比较器要比较的数据类型
+		public GroupToReduceCompare(){
+			super(TwoFiles.class);
+		}
+		//重写compare方法自定义排序规则
+		@Override
+		public int compare(WritableComparable a, WritableComparable b) {
+			TwoFiles tf1 = (TwoFiles)a;
+			TwoFiles tf2 = (TwoFiles)b;
+			return tf1.getFirstFiled().compareTo(tf2.getFirstFiled());
+		}
+		
+	}
+```
+### Combiner,实质是一个reduce,不过是在本地,即只计算这个map上的数据,为了减少Reduce的压力,所有能聚合的先实现combiner聚合,再传值给Reduce进行最后聚合,它是在map阶段分区之后,在进行聚合,肯定只会各个区之间聚合,不然不同区聚合,reduce拿数据就会出现问题,现排序(Comparator)再分区(Partitioner)最后聚合(Combinner)
+
+#### 设置分割符,例如keyvalueinputformat默认是"\t",修改这个有两种方式
+
+![][11]
+
+#### combiner的理解
+
+![][12]
 
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905726665.jpg
@@ -239,3 +515,6 @@ public static class UserVisitTimesMap extends Mapper<LongWritable, Text, Text, I
   [7]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905936208.jpg
   [8]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905953753.jpg
   [9]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905977282.jpg
+  [10]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508167450126.jpg
+  [11]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508168337754.jpg
+  [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508168383892.jpg
