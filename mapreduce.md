@@ -505,6 +505,60 @@ public static void main(String[] args) throws Exception {
 
 ![][12]
 
+#### combiner和reduce的复用
+
+![][13]
+
+``` stylus
+public static class FirstSortChangeMap extends Mapper<Text, Text, Text, Text>{
+
+		private final String ONE_STR = "1";
+		private final String ZERO_STR = "0";
+		private String[] infos;
+		private Text oKey = new Text();
+		private Text oValue = new Text();
+		@Override
+		protected void map(Text key, Text value, Mapper<Text, Text, Text, Text>.Context context)
+				throws IOException, InterruptedException {
+			//健壮性,不会因为源文件是空而使程序出问题
+			if(key.toString()!=null&&!key.toString().equals("")&&value.toString()!=null&&!key.toString().equals("")){
+				infos = value.toString().split("\\s");
+				oKey.set(infos[1]);
+				if(infos[0].equals("login")||infos[0].equals("new_tweet")){
+					oValue.set((infos[0].equals("login")?ONE_STR:ZERO_STR)+"\t"+
+				               (infos[0].equals("new_tweet")?ONE_STR:ZERO_STR));
+					context.write(oKey, oValue);
+				}
+			}
+			
+		}
+		
+	}
+	
+	public static class FirstSortChangeReduce extends Reducer<Text, Text, Text, Text>{
+
+		private Text oValue = new Text();
+		private String[] infos;
+		private int loginTimes;
+		private int new_tweetTimes;
+		@Override
+		protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, Text>.Context context)
+				throws IOException, InterruptedException {
+			loginTimes = 0;
+			new_tweetTimes =0;
+			for (Text value : values) {
+				infos = value.toString().split("\\s");
+				loginTimes += Integer.valueOf(infos[0]);
+				new_tweetTimes += Integer.valueOf(infos[1]);
+				oValue.set(loginTimes+"\t"+new_tweetTimes);
+			}
+			context.write(key, oValue);
+		}
+		
+	}
+```
+
+
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905726665.jpg
   [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905793135.jpg
@@ -518,3 +572,4 @@ public static void main(String[] args) throws Exception {
   [10]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508167450126.jpg
   [11]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508168337754.jpg
   [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508168383892.jpg
+  [13]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508216495868.jpg
