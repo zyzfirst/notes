@@ -20,8 +20,8 @@ grammar_cjkRuby: true
 >3. 数据展现(rdbms),此处rdbms就是各种数据库
 
 ### sequenceFile和Avro的比较
->sequencefile是hadoop框架自带的,保存数据和保存kv的数据格式,但是只能保存kv两个字段
->avro本身是二进制文件,所以展现的时候需要反序列化解析一下,才能转换成看得懂的text文本,它可以保存多个字段的格式
+>sequencefile是hadoop框架自带的,保存数据和保存kv的数据格式,但是只能保存kv两个字段,当有多个字段时就不再适用,操作简单
+>avro本身是二进制文件,所以展现的时候需要反序列化解析一下,才能转换成看得懂的text文本,它可以保存多个字段的格式,在mapreduce读取文件的话,一般需要配置schema文件并生成封装数据类,不生成的话,操作相对复杂,用相应的avrokey等格式传递数据,avrokeyvaklue,适用于map类型的,会把内容解析成kv的形式传过来
 
 ## avro的特性
 >arvo的特性和功能：
