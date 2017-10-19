@@ -314,6 +314,63 @@ public class AvroMergeSmallFile {
 
 
 ## mapreduce读取和存储avro文件
+### 首先pom添加依赖
+
+``` stylus
+<dependencies>
+  	<dependency>
+	    <groupId>org.apache.hadoop</groupId>
+	    <artifactId>hadoop-client</artifactId>
+	    <version>2.7.4</version>
+	</dependency>
+	<dependency>
+  		<groupId>org.apache.avro</groupId>
+  		<artifactId>avro</artifactId>
+  		<version>1.8.2</version>
+	</dependency>
+	<dependency>
+  		<groupId>org.apache.avro</groupId>
+  		<artifactId>avro-mapred</artifactId>
+  		<version>1.8.2</version>
+	</dependency>
+  
+  </dependencies>
+  
+  <build>
+  	<plugins>
+  	<plugin>
+  		<groupId>org.apache.avro</groupId>
+  		<artifactId>avro-maven-plugin</artifactId>
+  		<version>1.8.2</version>
+  <executions>
+    <execution>
+      <phase>generate-sources</phase>
+      <goals>
+        <goal>schema</goal>
+      </goals>
+      <configuration>
+        <sourceDirectory>${project.basedir}/src/main/avro/</sourceDirectory>
+        <outputDirectory>${project.basedir}/src/main/java/</outputDirectory>
+      </configuration>
+    </execution>
+  </executions>
+	</plugin>
+	<plugin>
+  		<groupId>org.apache.maven.plugins</groupId>
+  		<artifactId>maven-compiler-plugin</artifactId>
+  		<configuration>
+   	 	<source>1.8</source>
+    	<target>1.8</target>
+  	</configuration>
+	</plugin>
+  	</plugins>
+  
+  </build>
+```
+### 创建schema文件,生成模式对象,后缀为.avsc
+
+![][7]
+
 
 ### 序列化
 >1.AvroKey(UserActionLog)或者avrovalue(UserActionLog)格式,是把数据作为key或者value存储起来,看需求这个对象由datum()方法,有模式对象会存储,没有的话就会得到模式对象,模式对象可以得到自己的属性
@@ -326,9 +383,126 @@ public class AvroMergeSmallFile {
    job.setInputFormatClass(AvroKeyInputFormat.class);
 AvroJob.setInputKeySchema(job, UserActionLog.SCHEMA$);
 
+###  用mapreduce读取大文件,即合并之后的文件
 
+#### 1.设置avrokey<模式对象>
+>这样读取的,一次读取一个文件,放在key里,格式是二进制文件,需要key.datum().getcontent().array变成字节数组,然后调用new string(字节数组).split("\\s")就得到我们熟悉的内容,做wordcount的操作
 
+#### 2.设置输出的avrokey<模式对象>,或者不用模式对象
+>1. 生成了模式对象:创建avrokey<>作为outKey,然后创建模式对象,把数据set进模式对象,把对象set进avrokey中,在context写一下
+>2. 不生成模式对象:需要得到原声的封装模式的对象,new parser().paerser(new file(schema路径)),这个方法写在setup方法中,只需要初始化一次即可,这样得到schema对象,得到封装数据的类GenericRecord的对象,需要new GenericData.Record(schema对象),然后把数据put进GenericRecord对象,做之前的重复操作
+>3. 设置input/outputformat为相应的类,然后avroJob.setinput/output schema(job,schema对象)
 
+``` stylus
+//计算avro文件的词频
+public class AvroFileMr {
+//map读取avro文件,没读取一条记录,其实是一个小文件,对其进行wordcount解析,并以word,count形式发送给reduce
+	public static class AvroFileMrMap extends Mapper<AvroKey<SmallFile>, NullWritable, Text, IntWritable>{
+		private Text outKey = new Text();
+		private final IntWritable ONE = new IntWritable(1);
+		//接收原声的字节数组
+		private ByteBuffer content;
+		//接收文件分割之后的string内容
+		private String[] infos;
+		@Override
+		protected void map(AvroKey<SmallFile> key, NullWritable value,
+				Mapper<AvroKey<SmallFile>, NullWritable, Text, IntWritable>.Context context)
+				throws IOException, InterruptedException {
+			//因为是avro的大文件,所以得到的ByteBuffer,它会由很多的record,每次传过来是一个record,也就是一个文件
+			//key.datum()得到模式对象,由模式对象get到内容
+			content = key.datum().getContent();
+			//把字节文件转换成字符文件,也就是string类型,然后再用原来的方法,对文件进行分割变成一个个的单词
+			//ByteBuffer.array()变成字节数组,new string把自己数组变成字符串然后分割
+			infos = new String(content.array()).split("\\s");
+			for (String word : infos) {
+				outKey.set(word);
+				context.write(outKey, ONE);
+			}
+		}
+		
+	}
+	public static class AvroFileMrReduceTwo extends Reducer<Text, IntWritable, AvroKey<WordCount>, NullWritable>{
+		private AvroKey<WordCount> outKey = new AvroKey<WordCount>();
+		private NullWritable none = NullWritable.get();
+		private int sum;
+		private WordCount wordcount = new WordCount();
+		@Override
+		protected void reduce(Text key, Iterable<IntWritable> values,
+				Reducer<Text, IntWritable, AvroKey<WordCount>, NullWritable>.Context context)
+				throws IOException, InterruptedException {
+			sum = 0;
+			for (IntWritable value : values) {
+				sum += 0;
+			}
+			wordcount.setCount(sum);
+			wordcount.setWord(key.toString());
+			outKey.datum(wordcount);
+			context.write(outKey, none);
+		}
+		
+	}
+	public static class AvroFileMrReduce extends Reducer<Text, IntWritable, AvroKey<GenericRecord>, NullWritable>{
+
+		private int sum;
+		private NullWritable none = NullWritable.get();
+		private GenericRecord record ;
+		private Schema writerSchema;
+		private AvroKey<GenericRecord> outKey = new AvroKey<GenericRecord>();
+		
+		@Override
+		protected void setup(Reducer<Text, IntWritable, AvroKey<GenericRecord>, NullWritable>.Context context)
+				throws IOException, InterruptedException {
+			//只需要初始化一次
+			Parser parser = new Parser();
+			//把文件解析成schema对象,参数是file是一个文件
+			writerSchema = parser.parse(new File("src/main/avro/wordcount.avsc"));
+			//原生GenericRecord对象的获取方式是由GenericData调Record,传参schema对象得到
+			record = new GenericData.Record(writerSchema);
+		}
+
+		@Override
+		protected void reduce(Text key, Iterable<IntWritable> values,
+				Reducer<Text, IntWritable, AvroKey<GenericRecord>, NullWritable>.Context context)
+				throws IOException, InterruptedException {
+			sum = 0;
+			for (IntWritable value : values) {
+				sum += value.get();
+			}
+			//模式对象是set方法赋值,而原声对象需要put,并且自己写key的值
+			record.put("word", key);
+			record.put("count", sum);
+			outKey.datum(record);
+			context.write(outKey, none);
+		}
+      
+	}
+	public static void main(String[] args) throws Exception {
+		Configuration configuration = new Configuration();
+		Job job = Job.getInstance(configuration);
+		job.setJobName("avroAndMR");
+		job.setJarByClass(AvroFileMr.class);
+		job.setMapperClass(AvroFileMrMap.class);
+		job.setReducerClass(AvroFileMrReduce.class);
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(IntWritable.class);
+		job.setOutputKeyClass(AvroKey.class);
+		job.setOutputValueClass(NullWritable.class);
+		
+		job.setInputFormatClass(AvroKeyInputFormat.class);
+		AvroJob.setInputKeySchema(job, SmallFile.getClassSchema());
+		job.setOutputFormatClass(AvroKeyOutputFormat.class);
+		//schema的获取方式有两种:一种是由模式对象SmallFile.SCHEMA$或者SmallFile.getClassSchema()
+		//第二种方式是:由解析器parser调用parse方法,传schema文件的路径,解析得到schema对象
+		AvroJob.setOutputKeySchema(job, new Parser().parse(new File("src/main/avro/wordcount.avsc")));
+		FileInputFormat.addInputPath(job, new Path("/outputAvro.avro"));
+		Path path = new Path("/bd80/avroAndMr");
+		path.getFileSystem(configuration).delete(path, true);
+		FileOutputFormat.setOutputPath(job, path);
+		System.exit(job.waitForCompletion(true)?0:1);
+	}
+	
+}
+```
 
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508331555482.jpg
@@ -337,3 +511,4 @@ AvroJob.setInputKeySchema(job, UserActionLog.SCHEMA$);
   [4]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508333952211.jpg
   [5]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508334218105.jpg
   [6]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508334387163.jpg
+  [7]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508414067163.jpg
