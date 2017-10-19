@@ -235,6 +235,84 @@ public static void main(String[] args) throws Exception {
 
 }
 ```
+## avro可以作为容器,存储小文件,把小文件合并成一个大文件
+>相当于write的过程,只不过是write过程的模式对象中的数据是我们set或者设置的,而在合并文件的过程中,模式对象的值是先去读文件,读出来的,然后把模式对象append一下.
+
+### 合并文件的原理或者是流程
+>1.用fileUtils把文件夹下的所有文件读取出来,获取文件的路径,把所有文件的路径放到一个list集合中
+>2.创建writer和filewriter,然后创建输出目录传递参数schema(要声成大文件的schema)
+>3.遍历list集合,new file(path) 一个path就是一个文件,用工具读取文件的内容,fileUtils.readFileToArray把文件读成字节数组,再用bytebuffer.warp把字节数组转换成bytebuffer,把文件的内容和和get的abslutpath作为文件名放到模式对象中
+>filewriter把模式对象append和flush一下,就写入到一个大文件中了
+
+### 代码实现,小文件的合并和大文件的读取
+
+``` stylus
+//把一个文件夹下的小文件合并成大文件
+public class AvroMergeSmallFile {
+   private Schema.Parser parser = new Schema.Parser();
+   private Schema schema;
+   //用来设置添加要合并的文件的名称
+   private List<String> inputFilePaths = new ArrayList<>();
+   //在构造方法中初始化schema
+   public AvroMergeSmallFile(){
+	   schema = SmallFile.getClassSchema();
+   }
+   //添加要合并的文件夹
+   public void addInputFileDir(String inputDir) throws Exception{
+	   //获取文件夹下的所有的问价
+	   File[] files = FileUtil.listFiles(new File(inputDir));
+	   //把文件的路径添加到inputFilePaths中
+	   for (File file : files) {
+		   inputFilePaths.add(file.getPath());
+	}
+   }
+   //把inputFilePaths中的所有文件合并到一个avro文件中
+   public void mergeFile(String outputPath) throws Exception{
+	   DatumWriter<SmallFile> writer = new SpecificDatumWriter<>();
+	   DataFileWriter<SmallFile> filewriter = new DataFileWriter<>(writer);
+	   //创建avro文件
+	   filewriter.create(SmallFile.getClassSchema(), new File(outputPath));
+	   //把inputFilePaths的文件一个个读取出来根据模式放入到avro文件中
+	   for (String filepath : inputFilePaths) {
+		File inputFile = new File(filepath);
+		//把文件读成字节数组,放入content
+		//ByteBuffer调用wrap方法把字节数组封装成一个对象作为参数设置到content属性中去
+		byte[] content = FileUtils.readFileToByteArray(inputFile);
+		SmallFile oneSmallFile = SmallFile.newBuilder().setFileName(inputFile.getAbsolutePath())
+		.setContent(ByteBuffer.wrap(content)).build();
+		filewriter.append(oneSmallFile);
+		//DigestUtils.md5Hex(content)得到md5加密,若内容相同则md5一样
+		System.out.println("写入"+inputFile.getAbsolutePath()+"成功"+DigestUtils.md5Hex(content));
+	}
+	   filewriter.flush();
+	   filewriter.close();
+	   
+   }
+   //读取大avro的文件内容
+   public void readMergeFile(String avroFile) throws Exception{
+	   DatumReader<SmallFile> reader = new SpecificDatumReader<>();
+	   DataFileReader<SmallFile> filereader = new DataFileReader<>(new File(avroFile), reader);
+	   SmallFile smallFile = null;
+	   while(filereader.hasNext()){
+    	   smallFile = filereader.next();
+    	   System.out.println("文件名"+smallFile.getFileName());
+    	   //new String(bytes, charset)可以指定编码,因为存储的是字节数组,所以取出来也是,为了显示结果转换成string
+    	   System.out.println("md5:"+DigestUtils.md5Hex(smallFile.getContent().array()));
+    	  // System.out.println("文件内容"+new String(smallFile.getContent().array(),"utf-8"));
+    	   
+       }
+      filereader.close();
+   }
+   public static void main(String[] args) throws Exception {
+	AvroMergeSmallFile avroMergeSmallFile = new AvroMergeSmallFile();
+	avroMergeSmallFile.addInputFileDir("C:\\Users\\Administrator\\Desktop\\input");
+	avroMergeSmallFile.mergeFile("C:\\Users\\Administrator\\Desktop\\outputAvro.avro");
+	avroMergeSmallFile.readMergeFile("C:\\Users\\Administrator\\Desktop\\outputAvro.avro");
+}
+}
+```
+
+
 ## mapreduce读取和存储avro文件
 
 ### 序列化
