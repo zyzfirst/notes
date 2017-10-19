@@ -23,6 +23,8 @@ grammar_cjkRuby: true
 >sequencefile是hadoop框架自带的,保存数据和保存kv的数据格式,但是只能保存kv两个字段,当有多个字段时就不再适用,操作简单
 >avro本身是二进制文件,所以展现的时候需要反序列化解析一下,才能转换成看得懂的text文本,它可以保存多个字段的格式,在mapreduce读取文件的话,一般需要配置schema文件并生成封装数据类,不生成的话,操作相对复杂,用相应的avrokey等格式传递数据,avrokeyvaklue,适用于map类型的,会把内容解析成kv的形式传过来
 
+![][2]
+
 ## avro的特性
 >arvo的特性和功能：
 1：丰富的数据结构类型
@@ -69,7 +71,7 @@ grammar_cjkRuby: true
 ```
 >包括依赖和插件(自动生成schema文件的插件),generate-sources是自动生成代码的命令
 
-![][2]
+![][3]
 
 ## 在配置的路径下创建schema文件后缀为.avsc  例如user_action_log.avsc
 
@@ -96,17 +98,17 @@ grammar_cjkRuby: true
 >2.d:进入到盘符,这样就进入了src的目录下
 >3.执行命令 mvn generate-sources  因为是maven项目所以执行mvn命令
 
-![][3]
-
 ![][4]
-
-### 使用maven的configer,配置命令,然后直接run就可以
 
 ![][5]
 
-# 存储数据格式
+### 使用maven的configer,配置命令,然后直接run就可以
 
 ![][6]
+
+# 存储数据格式
+
+![][7]
 
 >Doug Cutting创建了Avro项目，它有数据序列化工具和RPC库组成，用于改进MapReduce中的数据交换频率、互操作性和版本控制。Avro使用压缩二进制数据格式（可以通过配置选项设置压缩，压缩可以快速提高序列化时间）。Avro可以直接在MR中该处理，可以使用通用的数据模型处理schema数据。
 >它的数据分为header和打他block,header中存放魔数和scheama
@@ -369,7 +371,7 @@ public class AvroMergeSmallFile {
 ```
 ### 创建schema文件,生成模式对象,后缀为.avsc
 
-![][7]
+![][8]
 
 
 ### 序列化
@@ -506,9 +508,10 @@ public class AvroFileMr {
 
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508331555482.jpg
-  [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508333095514.jpg
-  [3]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508333817781.jpg
-  [4]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508333952211.jpg
-  [5]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508334218105.jpg
-  [6]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508334387163.jpg
-  [7]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508414067163.jpg
+  [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508414515512.jpg
+  [3]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508333095514.jpg
+  [4]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508333817781.jpg
+  [5]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508333952211.jpg
+  [6]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508334218105.jpg
+  [7]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508334387163.jpg
+  [8]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508414067163.jpg
