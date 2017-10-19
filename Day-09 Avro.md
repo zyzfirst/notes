@@ -313,6 +313,8 @@ public class AvroMergeSmallFile {
 }
 }
 ```
+### 文件内容的比较,是否文件存到大文件中与原来相同,用md5技术
+>DigestUtils.md5Hex(smallFile.getContent().array()生成的密文相同,则说明内容相同
 
 
 ## mapreduce读取和存储avro文件
