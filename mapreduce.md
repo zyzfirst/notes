@@ -495,6 +495,25 @@ public static void main(String[] args) throws Exception {
 		
 	}
 ```
+### 分区与分组的区别：
+>分区是将有关联的键划分给同一个Reducer处理，
+多一个分区，也就多一个Reducer，同时也提高了分布式运算的效率
+同时将有关联的键放入一个分区也便于以后的管理
+
+>分组是将相同键的值迭代成一个列表，就是将相同的键的记录整理成一组记录
+在同一个分区里面，具有相同Key值的记录是属于同一个分组的。
+通俗点讲：
+分区是各个高速公路的路标，指示公路的要去往哪,进去哪个reduce,一个reduce会产生一个文件
+分组是对这些数据进行分车道行驶，按照一些共性。相同的key,会进一个reduce方法,对数据进行先沟通能干的操作,而key是否相同我们可以自定义实现compare接口,自定义相同规则
+
+### reduce和map的三个方法
+
+>setup方法: 初始化方法,在map或者reduce创建的时候会执行一次,此后不在执行
+
+>mao方法:  每一个不同的key会掉一次map方法,知道任务完成
+
+>cleanup方法 :  在job执行完成,最后执行一下,执行完最后一个map或是reduce方法,执行一次,可以利用三个方法的特性,在不同的方法里面做一些操作
+
 ### Combiner,实质是一个reduce,不过是在本地,即只计算这个map上的数据,为了减少Reduce的压力,所有能聚合的先实现combiner聚合,再传值给Reduce进行最后聚合,它是在map阶段分区之后,在进行聚合,肯定只会各个区之间聚合,不然不同区聚合,reduce拿数据就会出现问题,现排序(Comparator)再分区(Partitioner)最后聚合(Combinner)
 
 #### 设置分割符,例如keyvalueinputformat默认是"\t",修改这个有两种方式
@@ -557,6 +576,7 @@ public static class FirstSortChangeMap extends Mapper<Text, Text, Text, Text>{
 		
 	}
 ```
+### 倒排索引:map加载源文件,把单词作为key,把文件名(文件路径)作为value输出,同时在combiner上聚合单个文件的词频,在reduce上聚合,所有文件的词频,key是Text文件名+
 
 
 
