@@ -49,7 +49,10 @@ RM是一个全局的资源管理器，负责整个系统的资源管理和分配
  在应用程序运行过程中，用户可随时通过RPC向ApplicationMaster查询应用程序的当前运行状态。
 步骤8　应用程序运行完成后，ApplicationMaster向ResourceManager注销并关闭自己。
 
-![enter description here][1]
+![][1]
+
+![][2]
 
 
   [1]:https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508513100546.jpg
+  [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508513332419.jpg
