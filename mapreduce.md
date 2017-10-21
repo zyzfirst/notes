@@ -102,6 +102,8 @@ bbs.hadoopor.com --------Hadoop?技术论坛
 
 #### 总结
 
+![][6]
+
 >尽量直接放到内存中,尽量避免少的磁盘io读写和网络传输数据,会比较耗时.最后reduce阶段,其实目的也是尽可能多的在内存中完成,尽量减少磁盘io操作
 
 ## Mapreduce的代码实现
@@ -196,15 +198,15 @@ public static class MapreduceTestReduce extends Reducer<Text, IntWritable, Text,
 ```
 >不同的包里的job代表不同的版本,用新版本即可
 
-![][6]
+![][7]
 
 >需要注意的问题,输入目录可以为多个,输出目录只能为一个,不清楚是写入还是覆盖,因为处理结果写入非常耗时,所以可以执行前先检查是否存在,若存在就删除.若map和reduce的输出kv一样,那么可以不配置map的outputclass
-
-![][7]
 
 ![][8]
 
 ![][9]
+
+![][10]
 
 ### 实现功能:统计用户访问量
 
@@ -398,7 +400,7 @@ public static void main(String[] args) throws Exception {
 		
 	}
 ```
-![][10]
+![][11]
 
 >3.
 
@@ -508,7 +510,7 @@ public static void main(String[] args) throws Exception {
 
 ### reduce和map的三个方法
 
->setup方法: 初始化方法,在map或者reduce创建的时候会执行一次,此后不在执行
+>setup方法: 初始化方法,在map或者reduce创建的时候会执行一次,此后不在执行,每次执行一个文件会重新创建对象
 
 >mao方法:  每一个不同的key会掉一次map方法,知道任务完成
 
@@ -518,15 +520,15 @@ public static void main(String[] args) throws Exception {
 
 #### 设置分割符,例如keyvalueinputformat默认是"\t",修改这个有两种方式
 
-![][11]
+![][12]
 
 #### combiner的理解
 
-![][12]
+![][13]
 
 #### combiner和reduce的复用
 
-![][13]
+![][14]
 
 ``` stylus
 public static class FirstSortChangeMap extends Mapper<Text, Text, Text, Text>{
@@ -576,7 +578,461 @@ public static class FirstSortChangeMap extends Mapper<Text, Text, Text, Text>{
 		
 	}
 ```
-### 倒排索引:map加载源文件,把单词作为key,把文件名(文件路径)作为value输出,同时在combiner上聚合单个文件的词频,在reduce上聚合,所有文件的词频,key是Text文件名+
+### 倒排索引:map加载源文件,把单词作为key,把文件名(文件路径)作为value输出,同时在combiner上聚合单个文件的词频,在reduce上追加,所有文件的词频,key是word,value是文件名+词频
+>**注意**:一个MR处理的话,需要设置文件不分片,因为如果分片的话,一个文件会在两个map上分别聚合,然后在reduce端追加,也就是说会导致同文件的同word没有聚合,而是直接追加.map端的combiner就认为这个文件的所有内容都在map端已经完成了聚合,只需要在reduce端追加文件名即可,所以会导致错误. 因此我们会设置自定义的inputformat来设置文件不分片,在job中设置inputformatClass为自定义的这个类**job.setInputFormatClass(SplitInputFormat.class);**
+
+``` stylus
+//自定义inputfirmat,设置不分片,确保一个文件一个分片,一个文件不宜过大否则要另想办法
+	public static class SplitInputFormat extends TextInputFormat{
+        //返回false为不分片,除非一个文件大于128M
+		@Override
+		protected boolean isSplitable(JobContext context, Path file) {
+			return false;
+		}
+	}
+```
+>**注意:** 在得到文件名时,首先在setup的方法中定义,因为一个map的文件是来自一个文件,所以文件名是同一个,所以赋值一次就可以,用的方法是由context.getinputsplit(),然后它是inputsplit类型,需要强转一下,转成filesplit然后getPath().toString();得到文件名给value
+
+#### 不分片,那么用一个MR任务即可实现功能
+>**剖析:** 在map端读取源文件,将word作为key,将文件名作为value,然后自定义combiner实现word的聚合得到在文件出现的次数,在reduce端进行追加
+
+``` stylus
+//map加载源文件,解析成单词,把单词作为key文件名作为value输出,输出:key(单词),value:文件名
+	public static class InvertedIndexMap extends Mapper<LongWritable, Text, Text, Text>{
+
+		private String[] infos;
+		private Text oKey = new Text();
+		private Text oValue = new Text();
+		private String filePath;
+		private FileSplit fileSplit;
+		
+		@Override
+		protected void setup(Mapper<LongWritable, Text, Text, Text>.Context context)
+				throws IOException, InterruptedException {
+			
+			//设置文件路径,文件是指map正在执行处理的文件,在map开始的时候执行一次,map的个数或可以说初始化由split决定
+			//得到split对象,可以得到文件的路径
+			fileSplit = (FileSplit)context.getInputSplit();
+			filePath = fileSplit.getPath().toString();
+		}
+
+		@Override
+		protected void map(LongWritable key, Text value, Mapper<LongWritable, Text, Text, Text>.Context context)
+				throws IOException, InterruptedException {
+			infos = value.toString().split("[\\s\"\\(\\)\\:\\;\\.\\,\\*\\/\\#\\!\\-\\>\\<\\[\\]\\%]");
+			if(infos!=null&&infos.length>0){
+				for (String word : infos) {
+					oKey.set(word.toLowerCase());
+					oValue.set(filePath);
+					context.write(oKey, oValue);
+				}
+			}
+		}
+		
+	}
+	
+	//combiner,接收map的输出,然后统计每个key(单词)在改文件中出现的次数
+	//输出key(单词)value(文件名称[单词在文件中出现的次数])
+	
+	public static class InvertedIndexCombinner extends Reducer<Text, Text, Text, Text>{
+
+		private int wordCount;
+		private Text oValue = new Text();
+		private String filePath;
+		@Override
+		protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, Text>.Context context)
+				throws IOException, InterruptedException {
+			wordCount = 0;
+			for (Text path : values) {
+				wordCount += 1;
+				filePath = path.toString();
+			}
+			//同一个map的filepath是相同的
+			//filePath = values.iterator().next().toString();
+			oValue.set(filePath+"["+wordCount+"]");
+			context.write(key, oValue);
+		}
+		
+	}
+	
+	//reduce,接收combiner的输入,并把相同的key(下的values(文件名[词频]))
+	//按照字符串串接 输出key,value文件名(文件名[词频]--文件名[词频])
+	public static class InvertedIndexReduce extends Reducer<Text, Text, Text, Text>{
+
+		private StringBuffer valueStr;
+		private Text outputValue =new Text();
+		private boolean isInitlized;
+		@Override
+		protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, Text>.Context context)
+				throws IOException, InterruptedException {
+			valueStr =new StringBuffer();
+			isInitlized = false;
+			//因为设置了文件不分片,所以一个文件都在一个map上边,那么在map上的combiner聚合完成,就代表着这个文件聚合完成
+			//在reduce上只需要对接收的数据,遍历中间加上分隔符"---"即可
+			for (Text value : values) {
+				if(isInitlized){
+					valueStr.append("---"+value.toString());
+				}else{
+					//第一次往valueStr中放内容
+					valueStr.append(value.toString());
+					isInitlized = true;
+				}
+			}
+			outputValue.set(valueStr.toString());
+			context.write(key, outputValue);
+		}
+		
+	}
+```
+#### **TopN**不设置分片的话,聚合和追加就要分开,只能在reduce端聚合,在 map端的聚合已经不满足条件,因为不是整个文件的聚合,所以第一个MR只完成聚合操作,相当于combiner的操作,然后第二个MR读取第一次的结果,然后完成追加文件名
+
+### wordcount的topN问题
+>**剖析:**map端分割,把word作为key,把1作为value,在reduce端做聚合,因为只要topn,所以用到treemap,它默认是从小到大排序,并且有size,所以当局和完成后把kv放到treemap中,因为要排序,左一把v作为map的key,让它按照v来排序,如果size大于N那么就remove调firstkey,即最小的,这样的话就完成了topN的存放,在reduce技术之前,在cleanup方法中,把map的key遍历取出,倒序遍历然后context写进文件
+
+``` stylus
+public static class WordCountTopReducer extends Reducer<Text, IntWritable, Text, IntWritable>{
+        private int sum;
+		private Text oKey = new Text();
+		private IntWritable oValue = new IntWritable();
+		//开辟内存空间保存topn,treemap是一个排序的map,按照key排序
+		private TreeMap<Integer, String> topN = new TreeMap<Integer, String>();
+		@Override
+		protected void reduce(Text key, Iterable<IntWritable> values,
+				Reducer<Text, IntWritable, Text, IntWritable>.Context context) throws IOException, InterruptedException {
+			sum = 0;
+			for (IntWritable value : values) {
+				sum += value.get();
+			}
+			if(topN.size()<3){
+				if(topN.get(sum)!=null){
+					topN.put(sum, topN.get(sum)+"--"+key.toString());
+				}else{
+					topN.put(sum, key.toString());
+					
+				}
+			}else{
+				if(topN.get(sum)!=null){
+					topN.put(sum, topN.get(sum)+"--"+key.toString());
+				}else{
+					topN.put(sum, key.toString());
+					//treemap默认是从小到大排序
+					//topN.remove(topN.lastKey());
+					//留下大的,最后会倒叙
+					topN.remove(topN.firstKey());
+				}
+			}
+		}
+		@Override
+		protected void cleanup(Reducer<Text, IntWritable, Text, IntWritable>.Context context)
+				throws IOException, InterruptedException {
+			if(topN!=null&&!topN.isEmpty()){
+				//topN.desccend 倒叙拿出来
+				NavigableSet<Integer> keys = topN.descendingKeySet();
+				//Set<Integer> keys = topN.keySet();
+				for (Integer key : keys) {
+					oKey.set(topN.get(key));
+					oValue.set(key);
+					context.write(oKey, oValue);
+				}
+			}
+		}
+	}
+```
+### **GroupTopN**,业务呈现,统计用户名_ip的总的最常用ip登录的前n项
+>**业务分析:** 首先map端的功能局势拼接name_ip作为key,value为常数1,编译统计聚合,   
+
+>  因为key是组合的,按照默认的分区,分组已经不满足业务要求统计用户名常用ip,即要求统计相同用户名,因此重写分区,分组方法只按照key的"_"之前的name分组分区,
+
+>在reduce端,定义一个key为string,value为integer的map,存放聚合后的kv,这个就是要输出的格式,判断如果map中存在for循环中的key,那么value相加,否则直接放进去.
+
+>reduce定义一个key为integet,value为string的treemap,按照key排序取出前N个然后用context,写一下,完成
+
+``` stylus
+public static class GroupTopNPartitioner extends Partitioner<Text, IntWritable>{
+        private String[] infos;
+		@Override
+		public int getPartition(Text key, IntWritable value, int numPartitions) {
+			infos = key.toString().split("_");
+			return (infos[0].hashCode() & Integer.MAX_VALUE)%numPartitions;
+		}
+	}
+	public static class GroupTopNCompare extends WritableComparator{
+        //代表是否实例化,默认是false,若不实例化,则会空指针异常,父类不知道比较的类型
+		public GroupTopNCompare(){
+			super(Text.class,true);
+		}
+		@Override
+		public int compare(WritableComparable a, WritableComparable b) {
+			Text ta =(Text)a;
+			Text tb =(Text)b;
+			return ta.toString().split("_")[0].compareTo(tb.toString().split("_")[0]);
+		}
+	}
+	public static class GroupTopNReduce extends Reducer<Text, IntWritable, Text, IntWritable>{
+
+		private Text oKey = new Text();
+		private int sum;
+		private TreeMap<Integer, String> topN;
+		private Map<String, Integer> iploginTimes = new HashMap<>();
+		private IntWritable oValue = new IntWritable();
+		//求每个用户在每个ip上登录的次数,同时也求topN
+		@Override
+		protected void reduce(Text key, Iterable<IntWritable> values,
+				Reducer<Text, IntWritable, Text, IntWritable>.Context context) throws IOException, InterruptedException {
+			sum = 0;
+			iploginTimes = new HashMap<>();
+			topN = new TreeMap<Integer, String>();
+			//聚合,计算某个用户ip登录的总数.string,integer
+			for (IntWritable value : values) {
+				if(iploginTimes.containsKey(key.toString())){
+					iploginTimes.put(key.toString(), iploginTimes.get(key.toString())+value.get());
+				}else{
+					iploginTimes.put(key.toString(),value.get());
+				}
+			}
+			//计算topN,integet,string
+			for ( String userIp:iploginTimes.keySet()) {
+				if(topN.size()<3){
+					topN.put(iploginTimes.get(userIp), userIp);
+				}else{
+					topN.put(iploginTimes.get(userIp), userIp);
+					topN.remove(topN.firstKey());
+				}
+			}
+			//去除treemap中的数据,放到reduce里
+			for(int times: topN.descendingKeySet()){
+				oKey.set(topN.get(times));
+				oValue.set(times);
+				context.write(oKey, oValue);
+			}
+		}
+	}
+```
+### MR的链式结构
+>它的格式是map+  |  Reduce  map*    ,其中map和reduce至少一个,reduce至多一个,因为是链式的所以类似管道,前一个map或是reduce是下一个的输入
+
+>map和reduce的书写并无异同,只是在设置job的时候需要注意,在map端需要chainmap来一直addMapper,在reduce端先chainreduce,set一个reduce,然后再用chainreduce来addMapper
+
+``` stylus
+ChainMapper.addMapper(job, MRChainMap1.class, LongWritable.class, Text.class, Text.class, IntWritable.class, configuration);
+			ChainMapper.addMapper(job, MRChainMap2.class, Text.class, IntWritable.class, Text.class, IntWritable.class, configuration);
+		    ChainReducer.setReducer(job, MRChainReduce.class, Text.class, IntWritable.class, Text.class, IntWritable.class, configuration);
+		    ChainReducer.addMapper(job, MRChainMap3.class, Text.class, IntWritable.class, Text.class, IntWritable.class, configuration);
+```
+
+
+![][15]
+
+### MR的表关联
+
+#### Map端的关联
+>使用场景：一张表十分小、一张表很大。
+用法:在提交作业的时候先将小表文件放到该作业的DistributedCache中，然后从DistributeCache中取出该小表进行join key / value解释分割放到内存中（可以放大Hash Map等等容器中）。然后扫描大表，看大表中的每条记录的join key /value值是否能够在内存中找到相同join key的记录，如果有则直接输出结果。
+
+>**原理** DistributedCache是分布式缓存的一种实现，它在整个MapReduce框架中起着相当重要的作用，他可以支撑我们写一些相当复杂高效的分布式程序。说回到这里，JobTracker在作业启动之前会获取到DistributedCache的资源uri列表，并将对应的文件分发到各个涉及到该作业的任务的TaskTracker上。另外，关于DistributedCache和作业的关系，比如权限、存储路径区分、public和private等属性
+另外还有一种比较变态的Map Join方式，就是结合HBase来做Map Join操作。这种方式完全可以突破内存的控制，使你毫无忌惮的使用Map Join，而且效率也非常不错。
+
+>设置job  
+> //设置分布式缓存文件(小表)
+Path cachFilePath = new Path("/user_info.txt");
+job.addCacheFile(cachFilePath.toUri());
+
+``` stylus
+//计算每个省份的用户对系统的访问次数户
+public class MapJoin {
+	//map读取分布式缓存文件(小表数据),把它加载到一个hashmap中关联
+	//字段作为key,计算相关字段值作为value
+	//map方法中处理大表数据,每处理一条数据就取出相关关联字段,看hashmap
+	//是否存在,存在代表能关联上,不存在代表关联不上
+	public static class MapJoinMap extends Mapper<LongWritable, Text, Text, IntWritable>{
+        private HashMap<String, String> userInfos =new HashMap<>();
+		private String[] infos;
+		private Text oKey = new Text();
+		private final IntWritable ONE = new IntWritable(1);
+		@Override
+		protected void setup(Mapper<LongWritable, Text, Text, IntWritable>.Context context)
+				throws IOException, InterruptedException {
+			//获取分布式缓存文件的路径
+			URI[] cacheFiles = context.getCacheFiles();
+			//得到fileSystem对象,下文要得到输入输出流,进行hdfs读写就得得到这两个流
+			FileSystem fileSystem = FileSystem.get(context.getConfiguration());
+			for (URI uri : cacheFiles) {
+				//判断缓存文件是否是要读取的缓存,这个判断其实无效,因为所有的缓存文件都是这个结尾
+				if(uri.toString().contains("part-r-00000")){}
+				FSDataInputStream inputStream = fileSystem.open(new Path(uri));
+				//由inputStream,创建转换流,内部是inputStream,表明操作的是inputStreamReader
+				InputStreamReader inputStreamReader = new InputStreamReader(inputStream, "UTF-8");
+				//将转换流给缓冲流,得到缓冲流的写入或读取的方法
+				BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+				//缓冲流的读取方法
+				String line = bufferedReader.readLine();
+				while(line!=null){
+					infos = line.split("\\s");
+					userInfos.put(infos[0], infos[2]);
+					line = bufferedReader.readLine();
+				}
+			}
+		}
+		@Override
+		protected void map(LongWritable key, Text value, Mapper<LongWritable, Text, Text, IntWritable>.Context context)
+				throws IOException, InterruptedException {
+			//能关联就写进去
+		   infos = value.toString().split("\\s");
+		   //比较键,即关联字段
+		   if(userInfos.containsKey(infos[0])){
+			   //键得到的省份,需要用到的字段,储存在map中
+			   oKey.set(userInfos.get(infos[0]));
+			   context.write(oKey, ONE);
+		   }
+		}
+	}
+```
+#### reduce端关联
+
+>Map端的主要工作：为来自不同表（文件）的key/value对打标签以区别不同来源的记录。然后用连接字段作为key，其余部分和新加的标志作为value，最后进行输出。reduce端的主要工作：在reduce端以连接字段作为key的分组已经完成，我们只需要在每一个分组当中将那些来源于不同文件的记录（在map阶段已经打标志）分开，最后进行笛卡尔只就ok了。
+
+>自定义类实现writable接口,包括value和flag(来自那个文件),zaimap端的setup方法中得到flag即filename,
+>在reduce端根据filename分类,放到两个list中,然后笛卡尔积就行了
+
+``` stylus
+public class ReduceJoin {
+	//定义封装类型,把标签放进去
+	public static class ValueAndFlag implements Writable{
+
+		private String value;
+		private String flag;
+		
+		public String getValue() {
+			return value;
+		}
+
+		public void setValue(String value) {
+			this.value = value;
+		}
+
+		public String getFlag() {
+			return flag;
+		}
+
+		public void setFlag(String flag) {
+			this.flag = flag;
+		}
+
+		@Override
+		public void write(DataOutput out) throws IOException {
+			out.writeUTF(value);
+			out.writeUTF(flag);
+			
+		}
+
+		@Override
+		public void readFields(DataInput in) throws IOException {
+			this.value=in.readUTF();
+			this.flag=in.readUTF();
+			
+		}
+		
+	}
+	//map读取两个文件,根据来源把每一个kv对打上标签输出给reduce,key必须是关联字段,
+	public static class ReduceJoinMap extends Mapper<LongWritable, Text, Text, ValueAndFlag>{
+
+		private FileSplit inputSplit;
+		private String fileName;
+		private ValueAndFlag oValue = new ValueAndFlag();
+		private String[] infos;
+		private Text oKey = new Text();
+		//每个map由一个名字,所以在setup中得到名字
+		@Override
+		protected void setup(Mapper<LongWritable, Text, Text, ValueAndFlag>.Context context)
+				throws IOException, InterruptedException {
+			//得到inputsplit片能得到路径,知道是那个文件
+			inputSplit = (FileSplit)context.getInputSplit();
+			//路径比较不能使用equal
+			if(inputSplit.getPath().toString().contains("/user-logs-large.txt")){
+				fileName = "userlogslarge";
+			}else if(inputSplit.getPath().toString().contains("/user_info.txt")){
+				fileName = "userinfo";
+			}
+		}
+		@Override
+		protected void map(LongWritable key, Text value, Mapper<LongWritable, Text, Text, ValueAndFlag>.Context context)
+				throws IOException, InterruptedException {
+			oValue.setFlag(fileName);
+			infos = value.toString().split("\\s");
+			if(fileName.equals("userlogslarge")){
+				//解析userlog.txtde过程(用户名,行为类型,ip地址)
+				oKey.set(infos[0]);
+				oValue.setValue(infos[1]+"\t"+infos[2]);
+			}else if(fileName.equalsIgnoreCase("userinfo")){
+				//解析user-info.txt的过程,包括(用户名,性别,省份)
+				oKey.set(infos[0]);
+				oValue.setValue(infos[1]+"\t"+infos[2]);
+			}
+			context.write(oKey, oValue);
+		}
+		
+		
+	}
+	//接收map发送过来的kv,根据value中的flag来把同一个key对应的value分成两组
+	//那么两组中的数据就是分别来自两个表的数据,对这两个表中的数据进行笛卡尔积完成关联
+	//reduce端的关联方式,只能做关联,而不能做聚合了
+	public static class ReduceJoinReduce extends Reducer<Text, ValueAndFlag, Text, Text>{
+
+		private List<String> userlogslargeList;
+		private List<String> userinfoList;
+		private Text oValue = new Text();
+		@Override
+		protected void reduce(Text key, Iterable<ValueAndFlag> values,
+				Reducer<Text, ValueAndFlag, Text, Text>.Context context) throws IOException, InterruptedException {
+			userlogslargeList = new ArrayList<>();
+			userinfoList = new ArrayList<>();
+			for (ValueAndFlag value : values) {
+				if(value.getFlag().equals("userlogslarge")){
+					userlogslargeList.add(value.getValue());
+				}else if (value.getFlag().equals("userinfo")){
+					userinfoList.add(value.getValue());
+				}
+			}
+			//对两组中的数据进行笛卡尔乘积
+			for(String userlogslarge:userlogslargeList){
+				for(String userinfo:userinfoList){
+					oValue.set(userlogslarge+"\t"+userinfo);
+					context.write(key, oValue);
+				}
+			}
+		}
+		
+	}
+	public static void main(String[] args) throws Exception {
+		Configuration configuration = new Configuration();
+        Job job = Job.getInstance(configuration);
+        job.setJobName("reduceJoin");
+        job.setJarByClass(ReduceJoin.class);
+        
+        job.setMapperClass(ReduceJoinMap.class);
+        job.setReducerClass(ReduceJoinReduce.class);
+        
+        job.setMapOutputKeyClass(Text.class);
+        job.setMapOutputValueClass(ValueAndFlag.class);
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(Text.class);
+        
+        FileInputFormat.addInputPath(job, new Path("/user_info.txt"));
+        FileInputFormat.addInputPath(job, new Path("/user-logs-large.txt"));
+        Path path = new Path("/bd78/reduceJoin/forst");
+        path.getFileSystem(configuration).delete(path,true);
+        FileOutputFormat.setOutputPath(job, path);
+        
+        System.exit(job.waitForCompletion(true)?0:1);
+	}
+
+}
+```
+### 半连接
+>在map端过滤掉一些数据，在网络中只传输参与连接的数据不参与连接的数据不必在网络中进行传输，从而减少了shuffle的网络传输量，使整体效率得到提高，其他思想和reduce join是一模一样的。就是将小表中参与join的key单独抽出来通过DistributedCach分发到相关节点，然后将其取出放到内存中（可以放到HashSet中），在map阶段扫描连接表，将join key不在内存HashSet中的记录过滤掉，让那些参与join的记录通过shuffle传输到reduce端进行join操作，其他的和reduce join都是一样的。
+
+>把map的操作和reduce的操作结合起来,做两个MR,第一个读小文件,抽取关联的key,然后第二次把第一次的关联key作为你小文件读到缓存中,所以总共读了三个文件
+
 
 
 
@@ -585,11 +1041,13 @@ public static class FirstSortChangeMap extends Mapper<Text, Text, Text, Text>{
   [3]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905811418.jpg
   [4]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905830980.jpg
   [5]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905863586.jpg
-  [6]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905896186.jpg
-  [7]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905936208.jpg
-  [8]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905953753.jpg
-  [9]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905977282.jpg
-  [10]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508167450126.jpg
-  [11]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508168337754.jpg
-  [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508168383892.jpg
-  [13]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508216495868.jpg
+  [6]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508554085123.jpg
+  [7]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905896186.jpg
+  [8]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905936208.jpg
+  [9]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905953753.jpg
+  [10]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507905977282.jpg
+  [11]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508167450126.jpg
+  [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508168337754.jpg
+  [13]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508168383892.jpg
+  [14]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508216495868.jpg
+  [15]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508568265493.jpg
