@@ -24,5 +24,16 @@ grammar_cjkRuby: true
 # 图表比较
 ![][1]
 
+# 使用命令
+>一般情况map端设置为gzip,而reduce端用lzo,不过需要自行安装,hadoop本身不提供
+
+``` stylus
+//设置是否压缩
+		FileOutputFormat.setCompressOutput(job, true);
+		//设置压缩格式
+		FileOutputFormat.setOutputCompressorClass(job, GzipCodec.class);
+```
+
+
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508556733706.jpg
