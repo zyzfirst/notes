@@ -77,9 +77,11 @@ grammar_cjkRuby: true
 
 >2.发送MR任务到yarn上执行,提醒内存不够,那么去修改默认内存
 
-![enter description here][4]
+![][4]
 
-![enter description here][5]
+![][5]
+
+![][6]
 
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508771064119.jpg
@@ -87,3 +89,4 @@ grammar_cjkRuby: true
   [3]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508772368859.jpg
   [4]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508772488438.jpg
   [5]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508772499713.jpg
+  [6]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508772675604.jpg
