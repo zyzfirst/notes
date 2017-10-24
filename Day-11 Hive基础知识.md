@@ -163,7 +163,11 @@ grammar_cjkRuby: true
 ### 配置SQuirrel
 >**1.配置Driver:** 点击driver,然后点击+号,新增一个驱动,然后将两个jar包导入,点击ListDriver自动出现Class Name,点击oj即可,jar包位置,hadoop的common包
 
-![enter description here][12]
+![][12]
+
+![][13]
+
+![][14]
 
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508771064119.jpg
@@ -178,3 +182,5 @@ grammar_cjkRuby: true
   [10]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508774179375.jpg
   [11]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508774273846.jpg
   [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508774744806.jpg
+  [13]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508847702714.jpg
+  [14]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508847774409.jpg
