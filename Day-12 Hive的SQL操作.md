@@ -624,6 +624,11 @@ create table compress_order as
 select * from tmp_orders
 describe formatted compress_order
 ```
+### 阿里云镜像
+
+>- 添加如下代码在正确的位置,在conf的settting.xml下
+
+![][12]
 
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508854268069.jpg
@@ -637,3 +642,4 @@ describe formatted compress_order
   [9]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508939803750.jpg
   [10]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508939850153.jpg
   [11]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508940892389.jpg
+  [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509024996374.jpg
