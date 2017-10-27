@@ -63,6 +63,8 @@ grammar_cjkRuby: true
 ![][2]
 
 ## Impala,  PostgreSQL, SparkSQL的比较
+>**presto facebook旗下的产品 ,impala cloud公司,他有自己的 cdh版本的hadoop  这三个都是sql引擎,后两个计算速度比较快**
+
 >首先共同点是源于hive,并且没有自己的metastore,采用的是hive的metastore
 
 >**SparkSQL:** 删去了hive的mapreduce阶段,只采用metastore和hdfs机制,它是基于内存的,属于Spark框架的一部分.,提供通过Apache Hive的SQL变体Hive查询语言（HiveQL）与Spark进行交互的API。每个数据库表被当做一个RDD，Spark SQL查询被转换为Spark操作。而不是mapreduce操作
@@ -169,6 +171,29 @@ grammar_cjkRuby: true
 
 ![][14]
 
+>**配置Allases** 点击+号,选择之前配置好的driver,填写URL和用户名root,然后可以Test一下,成功了点击ok确定即可,然后可以直接点击allases然后连接,需要先选择数据库
+
+![][15]
+
+### SQuirrel的使用
+>首先需要开启集群的服务,因为他需要依赖hadoop把任务发布到yarn上,然后他需要开启hiveserver2服务,它是一个服务器,必须先开启服务,才能进行下边的操作,这个可以看进程,MR任务的进度
+
+## Beeline CLI的使用
+>用的比较少,首先开启hiveserver2服务--->beeline进入beeline--->!connect jdbc:hive2://master:10000连接数据库--->输入用户名root不用密码,然后就执行命令即可
+
+![][16]
+
+### 常用命令
+>create table docs(line string);括号里是字段名和数据类型,创建表
+  create database bd14; 创建数据库
+  use bd14;   使用数据库
+  show tables;  查看数据库中的所有的表
+  load data inpath '/README.txt' overwrite into table docs;把文件覆写在docs表
+  select explode(split(line,'[\\s\\.]+')) from docs; 把每行转换成多行,把docs中的数据截取成word
+  select word,count(*) from (select explode(split(line,'[\\s\\,]+')) as word from docs) a group by word;  查找表中的所有单词并得出个数 ,以word分组
+  select word,count(*) from (select explode(split(line,'[\\s\\.\\,\\:\\/\\>\\<\\(\\)]+'))as word from docs) a group by word; 终极分割
+  select * from docs; 查看所有
+
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508771064119.jpg
   [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508771231653.jpg
@@ -184,3 +209,5 @@ grammar_cjkRuby: true
   [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508774744806.jpg
   [13]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508847702714.jpg
   [14]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508847774409.jpg
+  [15]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508848174798.jpg
+  [16]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508848906823.jpg
