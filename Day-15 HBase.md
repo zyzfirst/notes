@@ -85,6 +85,10 @@ Hadoop-hdfs-------》hadoop-yarn------》zookeeper------》hbase
 
 ![][2]
 
+## hbase的特点
+>hbase是反模式的数据库,列式存储,用空间换性能,储存空间需要比较大,查询比较快,而数据库是模式,为了减少冗余数据
+ >hbase是稀疏的,有字段就存储没有的话就不在存储,而rdbms不管有没有值都会存在字段,所以hbase也节约了空间,灵活性比较高,但是规则低,所以由自行的约定规则,不在强加
+
 # 命令
 >hbase shell 命令
  create_namespace 'bd14'     //创建数据库
