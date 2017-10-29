@@ -77,3 +77,28 @@ HRegionServer
 启动顺序
 Hadoop-hdfs-------》hadoop-yarn------》zookeeper------》hbase
 
+# hbase的数据存储结构
+
+![][1]
+
+>kv的格式
+
+![][2]
+
+# 命令
+>hbase shell 命令
+ create_namespace 'bd14'     //创建数据库
+ create 'bd14:user','i','c'        //创建表 指定列簇
+ list_namespace_tables 'bd14'  //查看表 指定数据库
+ list_namespace                  //查看当前数据库
+ describe 'bd14:user'     //查看表结构 指定表名字  数据库:表名 并且用单引号
+ put 'bd14:user','1','i:username','zhangsan' 插入数据 '表名''rowkey''列名''时间戳' 如果不写列名,那么也会加进去,只不过是列名为空
+ get 'bd14:user','1' //查看数据  在value前边由一个时间戳
+ 'bd14:user','1','c:email' +'时间戳' 可以加上时间戳更精确,前边是必填 rpwkey+列名 确定一条数据
+ truncate 'bd14:user' //清空表数据
+ disable 'bd14:user' drop 'bd14:user'  //删除表结构,需要先disable,然后再执行drop命
+
+
+
+  [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509272728879.jpg
+  [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509272746527.jpg
