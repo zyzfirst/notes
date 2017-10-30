@@ -249,6 +249,13 @@ public static void getStatus(String fileName) throws Exception {
 
 ![][11]
 
+## hdfs的安全模式
+>安全模式下,指启动了namenode还没有启动datanode,namenode等待datanode向他发送block数量的数据,在这种模式下,只能查看文件的系统上的文件个数,不能查看内容,因为内容储存在datanode上,而datanode还没有开启服务,并且不能创建新文件夹,上传文件,删除文件等操作
+
+>手动开启或关闭命令
+
+![][12]
+
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507908698738.jpg
   [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507908721447.jpg
@@ -261,3 +268,4 @@ public static void getStatus(String fileName) throws Exception {
   [9]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507911039298.jpg
   [10]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507911090876.jpg
   [11]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507911153197.jpg
+  [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509366204455.jpg
