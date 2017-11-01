@@ -495,3 +495,24 @@ SELECT s.* FROM student s WHERE MONTH(Sage)=MONTH(CURRENT_DATE)
 # 50、查询下月过生日的学生
 SELECT s.* FROM student s WHERE MONTH(Sage)=MONTH(CURRENT_DATE)+1
 
+# 总结
+1.内链接 外连接的on条件后只能跟原始条件,不能跟查询后的条件,要想跟查询后的条件,需要在having后加,group分组后的条件写在group后
+2.子查询的结果只能查出来一个,多于一行报错Subquery returns more than 1 row
+3.in和exists的区别(大表小表的效率问题)  not in和not exists尽量使用后者
+4.行转列  MAX(CASE Subject WHEN '语文' THEN Score ELSE 0 END) AS '语文',
+  
+5.distinct去重,可以去除多个字段DISTINCT a.S,a.C,a.score 会按照三个字段都不相同的记录去重
+6.set @rank=0;可以定义变量 用@表示
+7.左连接大于子查询,not exists,exists代替 not in,用in替代 or(or的效率极低),用>=代替>,
+8.某一组内,记录完全相同,用group_concat
+  group_concat()会计算哪些行属于同一组，将属于同一组的列显示出来。要返回哪些列由函数参数(就是字段名)决定。分组必须有个标准，就是根据group by指定的列进行分组。
+
+9.日期时间的总结:
+ date_sub 减去时间可以使day,week,month等
+ current_date 获取当前时间
+ year,month,day等获取时间的 特定格式
+ date_format(date,'%Y-%m-%d') 转换时间格式,返回值还是date类型
+ date_add 加时间 同date_sub
+ weekday(date) 返回当前时间的星期索引,0是星期一
+ date_sub的用法: date_sub(current_date,interval 数值 数值类型(day,week,month等))
+
