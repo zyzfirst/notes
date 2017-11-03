@@ -258,6 +258,18 @@ public static void getStatus(String fileName) throws Exception {
 
 ![][13]
 
+## 在eclipse上连接hdfs
+
+>先把mapreduce location调出来,然后配置一个连接,下图是流程和结果图对比
+
+![][14]
+
+![][15]
+
+![][16]
+
+![][17]
+
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507908698738.jpg
   [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507908721447.jpg
@@ -272,3 +284,7 @@ public static void getStatus(String fileName) throws Exception {
   [11]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1507911153197.jpg
   [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509366204455.jpg
   [13]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509366527943.jpg
+  [14]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509711368715.jpg
+  [15]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509711313256.jpg
+  [16]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509711494846.jpg
+  [17]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509711524631.jpg
