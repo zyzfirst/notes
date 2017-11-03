@@ -101,6 +101,7 @@ Hadoop-hdfs-------》hadoop-yarn------》zookeeper------》hbase
  'bd14:user','1','c:email' +'时间戳' 可以加上时间戳更精确,前边是必填 rpwkey+列名 确定一条数据
  truncate 'bd14:user' //清空表数据
  disable 'bd14:user' drop 'bd14:user'  //删除表结构,需要先disable,然后再执行drop命
+ scan 'bd14:user'  查看表中数据,是看整张表
  
  # hbase系统
  
