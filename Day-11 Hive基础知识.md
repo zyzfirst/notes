@@ -164,6 +164,7 @@ grammar_cjkRuby: true
 
 ### 配置SQuirrel
 >**1.配置Driver:** 点击driver,然后点击+号,新增一个驱动,然后将两个jar包导入,点击ListDriver自动出现Class Name,点击oj即可,jar包位置,hadoop的common包
+>jar包需要从linux环境下载到SQuirrel的extendlib下,即它的扩展lib下
 
 ![][12]
 
@@ -171,9 +172,11 @@ grammar_cjkRuby: true
 
 ![][14]
 
+![][15]
+
 >**配置Allases** 点击+号,选择之前配置好的driver,填写URL和用户名root,然后可以Test一下,成功了点击ok确定即可,然后可以直接点击allases然后连接,需要先选择数据库
 
-![][15]
+![][16]
 
 ### SQuirrel的使用
 >首先需要开启集群的服务,因为他需要依赖hadoop把任务发布到yarn上,然后他需要开启hiveserver2服务,它是一个服务器,必须先开启服务,才能进行下边的操作,这个可以看进程,MR任务的进度
@@ -181,7 +184,7 @@ grammar_cjkRuby: true
 ## Beeline CLI的使用
 >用的比较少,首先开启hiveserver2服务--->beeline进入beeline--->!connect jdbc:hive2://master:10000连接数据库--->输入用户名root不用密码,然后就执行命令即可
 
-![][16]
+![][17]
 
 ### 常用命令
 >create table docs(line string);括号里是字段名和数据类型,创建表
@@ -206,8 +209,9 @@ grammar_cjkRuby: true
   [9]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508773743730.jpg
   [10]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508774179375.jpg
   [11]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508774273846.jpg
-  [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508774744806.jpg
-  [13]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508847702714.jpg
-  [14]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508847774409.jpg
-  [15]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508848174798.jpg
-  [16]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508848906823.jpg
+  [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509721045253.jpg
+  [13]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508774744806.jpg
+  [14]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508847702714.jpg
+  [15]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508847774409.jpg
+  [16]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508848174798.jpg
+  [17]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508848906823.jpg
