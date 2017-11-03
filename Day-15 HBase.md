@@ -189,6 +189,67 @@ HFile里面的每个KeyValue对就是一个简单的byte数组。但是这个byt
 上图中示意了HLog文件的结构，其实HLog文件就是一个普通的Hadoop Sequence File，Sequence File 的Key是HLogKey对象，HLogKey中记录了写入数据的归属信息，除了table和region名字外，同时还包括 sequence number和timestamp，timestamp是“写入时间”，sequence number的起始值为0，或者是最近一次存入文件系统中sequence number。
 HLog Sequece File的Value是HBase的KeyValue对象，即对应HFile中的KeyValue
 
+# Hbase的应用场景
+hbase的两个应用场景:第一是对接web应用用于查询结果的展示,第二个是作为数据来源和数据分析的保存
+
+>**数据来源:**hbase表中数据的来源:业务数据和批处理数据
+
+![][12]
+
+# Hbase的行键设计原则
+## 原理
+HBase是一个分布式的、面向列的数据库，它和一般关系型数据库的最大区别是：HBase很适合于存储非结构化的数据，还有就是它基于列的而不是基于行的模式。
+既然HBase是采用KeyValue的列存储，那Rowkey就是KeyValue的Key了，表示唯一一行。Rowkey也是一段二进制码流，最大长度为64KB，使用上一般不超过100个字节,内容可以由使用的用户自定义。数据加载时，一般也是根据Rowkey的二进制序由小到大进行的。
+HBase是根据Rowkey来进行检索的，系统通过找到某个Rowkey (或者某个 Rowkey 范围)所在的Region，然后将查询数据的请求路由到该Region获取数据。HBase的检索支持3种方式：
+（1） 通过单个Rowkey访问，即按照某个Rowkey键值进行get操作，这样获取唯一一条记录；
+（2） 通过Rowkey的range进行scan，即通过设置startRowKey和endRowKey，在这个范围内进行扫描。这样可以按指定的条件获取一批记录；
+（3） 全表扫描，即直接扫描整张表中所有行记录。
+HBASE按单个Rowkey检索的效率是很高的，耗时在1毫秒以下，每秒钟可获取1000~2000条记录，不过非key列的查询很慢。
+
+## 行键原则
+
+### Rowkey长度原则
+Rowkey是一个二进制码流，Rowkey的长度被很多开发者建议说设计在10~100个字节，不过建议是越短越好，不要超过16个字节。
+1.不宜过长,在100字节以内
+2.定长 方便划分范围
+3.长度最好是8的整数倍(每次读8个字节)
+>原因如下：
+（1）数据的持久化文件HFile中是按照KeyValue存储的，如果Rowkey过长比如100个字节，1000万列数据光Rowkey就要占用100*1000万=10亿个字节，将近1G数据，这会极大影响HFile的存储效率；
+（2）MemStore将缓存部分数据到内存，如果Rowkey字段过长内存的有效利用率会降低，系统将无法缓存更多的数据，这会降低检索效率。因此Rowkey的字节长度越短越好。
+（3）目前操作系统是都是64位系统，内存8字节对齐。控制在16个字节，8字节的整数倍利用操作系统的最佳特性。
+
+### Rowkey散列原则
+原因:时间是顺序的,所以会进入一个regin,所以高位随机产生保证散列
+
+Rowkry散列的方法:
+1.随机数
+2.Uuid
+3.md5, hash等加密算法
+4.业务有序数据反向(对业务有序数据进行反向 reverse)
+如果Rowkey是按时间戳的方式递增，不要将时间放在二进制码的前面，建议将Rowkey的高位作为散列字段，由程序循环生成，低位放时间字段， 这样将提高数据均衡分布在每个Regionserver实现负载均衡的几率。如果没有散列字段，首字段直接是时间信息将产生所有新数据都在一个 RegionServer上堆积的热点现象，这样在做数据检索的时候负载将会集中在个别RegionServer，降低查询效率。
+### Rowkey唯一原则
+必须在设计上保证其唯一性。
+Rowkey作为索引原则
+Rowkey是hbase里面的唯一索引,对于某些查询频繁的限定条件数据需要把它的内容存放在roqkey里面
+
+### Rowkey 的字符串原则
+
+![][13]
+
+# 二级索引
+## 关系型数据库的有关功能实现
+数据库的业务逻辑,不便与迁移(events(存储过程),triggers触发器(检测插入等))
+协处理器coprocesser:endpoint(存储过程) observer(触发器)
+>关系型数据库是通过event和triggers来实现 表关联,在插入数据的时候,对关联的表做响应的操作
+>phoenix通过coprocesser来实现  表和表的关联,当插入数据的时候,同时插入到索引库
+
+![][14]
+
+## 二级索引解决问题
+>二级索引hbase不支持(经常查询,又不能放在rowkey中)
+>hbase中不支持其他索引,索引就是rowkey,只支持单行的事务,对于事务型的应用支持不好,支持查询型的一些应用,并且不支持表关联(phoenix) phoenix解决这些问题(二级索引,表关联)
+>**habase的元数据在phoenix维护,像hive的元数据维护在mysql,**
+
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509721184008.jpg
   [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509272728879.jpg
@@ -201,3 +262,6 @@ HLog Sequece File的Value是HBase的KeyValue对象，即对应HFile中的KeyValu
   [9]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509372820410.jpg
   [10]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509372851487.jpg
   [11]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509372888816.jpg
+  [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509722866292.jpg
+  [13]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509723887527.jpg
+  [14]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509724348720.jpg
