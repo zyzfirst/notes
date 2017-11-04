@@ -251,6 +251,169 @@ Rowkey是hbase里面的唯一索引,对于某些查询频繁的限定条件数�
 >hbase中不支持其他索引,索引就是rowkey,只支持单行的事务,对于事务型的应用支持不好,支持查询型的一些应用,并且不支持表关联(phoenix) phoenix解决这些问题(二级索引,表关联)
 >**habase的元数据在phoenix维护,像hive的元数据维护在mysql,**
 
+## javaAPI来读取,存储hbase
+首先需要引入依赖hbase-server和hbase-client
+
+### map
+- 继承tableMap 
+- 值封装在value中,通过get.row和get.value可以得到rowkey和响应的值
+- 需要TableMapReduceUtil.initTableMapperJob("bd14:orderItemsByRow",scan, OrderItemsIndexMap.class, Text.class, Text.class, job);
+
+### reduce
+- 继承tablereduce
+- 创建Put对象,put=rowkey,put.addcolumn
+- key为nullwriable,value就是Mutation类型
+- TableMapReduceUtil.initTableReducerJob("bd14:orderIndexTest", OrderItemsIndexReduce.class, job);指定输出表和reduce的类加载器
+
+# 协处理器
+## 目的
+HBase作为列族数据库最经常被人诟病的特性包括：无法轻易建立“二级索引”，难以执行求和、计数、排序等操作。,为了解决这些问题,推出了协处理器
+
+## 特性:分布式
+包括以下特性:
+每个表服务器的任意子表都可以运行代码
+客户端的高层调用接口(客户端能够直接访问数据表的行地址，多行读写会自动分片成多个并行的RPC调用)
+提供一个非常灵活的、可用于建立分布式服务的数据模型
+能够自动化扩展、负载均衡、应用请求路由
+HBase的协处理器灵感来自bigtable，但是实现细节不尽相同。HBase建立了一个框架，它为用户提供类库和运行时环境，使得他们的代码能够在HBase region server和master上处理。
+
+## 原理
+协处理器分两种类型，系统协处理器可以全局导入region server上的所有数据表，表协处理器即是用户可以指定一张表使用协处理器。协处理器框架为了更好支持其行为的灵活性，提供了两个不同方面的插件。一个是观察者（observer），类似于关系数据库的触发器。另一个是终端(endpoint)，动态的终端有点像存储过程。
+
+### observer
+
+观察者的设计意图是允许用户通过插入代码来重载协处理器框架的upcall方法，而具体的事件触发的callback方法由HBase的核心代码来执行。协处理器框架处理所有的callback调用细节，协处理器自身只需要插入添加或者改变的功能。
+以HBase0.92版本为例，它提供了三种观察者接口：
+RegionObserver：提供客户端的数据操纵事件钩子(即回调函数)：Get、Put、Delete、Scan等,一般使用BaseRegionObserver。
+WALObserver：提供WAL相关操作钩子(监听日志记录)。
+MasterObserver：提供DDL-类型的操作钩子。如创建、删除、修改数据表等(对表的操作是hmaster来负责,具体表的数据操作是reginserver来负责)。
+
+#### javaAPI的实现
+
+##### 是自定义的协处理器生效,不完美如果是update操作,或是delete操作,没考虑callback的操作
+步骤1.创建项目,添加hbase依赖,在项目定义observer类,继承basereginonserver类,重写方法监听触发功能
+	   2.项目打成jar包,放到hdfs上,或是hbase的lib下(三个节点都要有,所以放到hdfs上)
+	    3.把协处理器添加到源表  alter 'bd14:orderItemsByRow','coprocessor'=>'hdfs:///comprocess.jar|
+	     com.zhiyou.hbase.comprocess.SecondryIndexAutoUpdate|1001|'
+
+``` stylus
+package com.zhiyou.hbase.comprocess;
+
+import java.io.IOException;
+import java.util.List;
+
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
+import org.apache.hadoop.hbase.client.Durability;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
+import org.apache.hadoop.hbase.coprocessor.ObserverContext;
+import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
+import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
+import org.apache.hadoop.hbase.util.Bytes;
+
+/**  
+* @ClassName: SecondryIndexAutoUpdate  
+* @Description: TODO  
+* @author zyz  
+* @date 2017年11月4日 下午3:07:59  
+*   
+*/
+//使用observer的comprocess来自动更新order_items的二级索引数据
+//把这个协处理器添加到order_items表上,索引数据自动更新到order_items_index里
+public class SecondryIndexAutoUpdate extends BaseRegionObserver {
+
+	//在表数据被put之前执行索引数据的添加,也可以在之后添加索引,因为同属一个transation,所以会保证同时成功
+	//e 是上下文环境,put是传过来要更新或是插入的put对象,edit是日志,druablity是表明两者关系,先写日志还是先插入数据
+	@Override
+	public void prePut(ObserverContext<RegionCoprocessorEnvironment> e, Put put, WALEdit edit, Durability durability)
+			throws IOException {
+		//获取此次写操作的subtotal的值的cell.做判断,如果不含subtotal那么此次操作无效(加入原表的数据中截取index表中的rowkey)
+	    List<Cell> subtotalCell = put.get(Bytes.toBytes("i"), Bytes.toBytes("order_items_subtotal"));
+	    if(subtotalCell!=null && subtotalCell.size()>0){
+	    	RegionCoprocessorEnvironment environment = e.getEnvironment();
+			Connection connection = ConnectionFactory.createConnection(environment.getConfiguration());
+		    Table table = connection.getTable(TableName.valueOf("bd14:orderIndex"));
+	    	//把获取的subtotal的值,作为rowkey赋值给put
+		    Put indexPut = new Put(CellUtil.cloneValue(subtotalCell.get(0)));
+	        //添加原表的rowkey作为index表的列名
+		    indexPut.addColumn("i".getBytes(), put.getRow(), null);
+	        table.put(indexPut);
+	        table.close();
+	    }
+	
+	}
+	//步骤1.创建项目,添加hbase依赖,在项目定义observer类,继承basereginonserver类,重写方法监听触发功能
+	//     2.项目打成jar包,放到hdfs上,或是hbase的lib下(三个节点都要有,所以放到hdfs上)
+	//     3.把协处理器添加到源表  alter 'bd14:orderItemsByRow','coprocessor'=>'hdfs:///comprocess.jar|
+	//     com.zhiyou.hbase.comprocess.SecondryIndexAutoUpdate|1001|'
+}
+```
+
+
+### endpoint(全局:求和、计数、排序)
+终端是动态RPC插件的接口，它的实现代码被安装在服务器端，从而能够通过HBase RPC唤醒。客户端类库提供了非常方便的方法来调用这些动态接口，它们可以在任意时候调用一个终端，它们的实现代码会被目标region远程执行，结果会返回到终端。用户可以结合使用这些强大的插件接口，为HBase添加全新的特性。终端的使用，如下面流程所示：
+定义一个新的protocol接口，必须继承CoprocessorProtocol.
+实现终端接口，该实现会被导入region环境执行。
+继承抽象类BaseEndpointCoprocessor.
+在客户端，终端可以被两个新的HBase Client API调用 。单个region：HTableInterface.coprocessorProxy(Class<T> protocol, byte[] row) 。rigons区域：HTableInterface.coprocessorExec(Class<T> protocol, byte[] startKey, byte[] endKey, Batch.Call<T,R> callable)
+
+
+#### 配置  :启用协处理器 Aggregation(Enable Coprocessor Aggregation)
+
+>我们有两个方法：1.启动全局aggregation，能过操纵所有的表上的数据。通过修改hbase-site.xml这个文件来实现，只需要添加如下代码：
+<property> <name>hbase.coprocessor.user.region.classes</name> <value>org.apache.hadoop.hbase.coprocessor.AggregateImplementation</value> </property>
+
+>2.启用表aggregation，只对特定的表生效。通过HBase Shell 来实现。
+(1)disable指定表。hbase> disable 'mytable'
+(2)添加aggregation hbase> alter 'mytable', METHOD => 'table_att','coprocessor'=>'|org.apache.hadoop.hbase.coprocessor.AggregateImplementation||'
+(3)重启指定表 hbase> enable 'mytable'
+
+``` stylus
+package com.zhiyou.hbase.aggregation;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.coprocessor.AggregationClient;
+import org.apache.hadoop.hbase.client.coprocessor.LongColumnInterpreter;
+
+/**  
+* @ClassName: RowCountAggregation  
+* @Description: TODO  
+* @author zyz  
+* @date 2017年11月4日 下午4:54:44  
+*   
+*/
+public class RowCountAggregation {
+
+	public static Configuration configuration = HBaseConfiguration.create();
+    public AggregationClient aggregationClient;
+    public RowCountAggregation(){
+    	aggregationClient = new AggregationClient(configuration);
+    }
+    public void getRowCount() throws Throwable{
+    	Scan scan = new Scan();
+    	scan.addFamily("i".getBytes());
+    	//new LongColumnInterpreter() 这个类把数值转换成long类型的再去计算
+    	long rowCount = aggregationClient.rowCount(TableName.valueOf("bd14:orderIndex"), new LongColumnInterpreter(), scan);
+       System.out.println(rowCount);
+    }
+    public static void main(String[] args) throws Throwable {
+		RowCountAggregation rowCountAggregation = new RowCountAggregation();
+	    rowCountAggregation.getRowCount();
+    }
+}
+```
+
+
+
+
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509721184008.jpg
   [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509272728879.jpg
