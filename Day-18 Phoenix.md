@@ -91,6 +91,9 @@ create table phoenix_us(
 ```
 其实phoenix提供一种映射,把非关系型的hbase转换成关系型的表结构,table_schema表示hbase中的库的名字,
 
+### 特点
+更新操作必须的有主键,phoenix表必须有主键,表示和rowkey的唯一映射
+
 ### 基本操作
 
 【分类】
