@@ -97,6 +97,8 @@ job和link   是数据导入导出配置对象,过程设置在这两个对象中
 submission查看当前已提交的sqoop的导入导出任务
 
 # 创建一个job,from mysql To hdfs
+>因为呢需要连接数据库,所以需要连接数据库的jar包,将jar包拷贝到sqoop的lib目录下,是第三方jar默认的存放位置
+
 ## 创建mysql的link(因为sqoop会发布到yarn上运行,且只有master有mysql,所以不能使用localhost)
 
 ![标识符][13]
@@ -160,6 +162,147 @@ submission查看当前已提交的sqoop的导入导出任务
 
 ![正确信息][27]
 
+# 关于sqoop的@BASEDIR和@LOGSDIR
+- 首先这两个文件,会生成在启动sqoop服务的目录下
+- @BASEDIR中存放元数据
+- @LOGSDIR sqoop的操作日志
+- 若启动服务的目录不一致,那么会导致元数据丢失,之前创建的link,job就不存在 了
+
+# 把hdfs中的数据导入到mysql(支持CSV)
+- CSV格式是逗号隔开的文本格式(1,账单,10)
+- 将数据导入到mysql中,只支持这种格式的数据
+
+# 把hdfs上的文件导入到hive的mysql中
+
+![][28]
+
+## 打开mysql,创建表
+
+![创建表][29]
+
+# 常用命令和注意事项
+- show link;列出当前所有link
+- show job ; 列出当前所有job
+- show link -n linkName;列出此名称的link
+- update link -n Jobname ;更新link,需要重新输入密码
+- 删除link,需要先删除job,删除job,需要先diaable,然后再删除,然后diaable link -n name disable 一下link,然后才能删除
+
+![删除link][30]
+
+- sqoop2-server start  开启服务
+- sqoop2-server stop  关闭服务
+- sqoop2-shell 连接服务
+- ctrl+c 断开连接
+
+# javaAPI实现从hdfs上读文件,写到本地的mysql中
+
+``` stylus
+package com.zhiyou.sqoop.client;
+
+import java.util.List;
+
+import org.apache.sqoop.client.SqoopClient;
+import org.apache.sqoop.model.MConfig;
+import org.apache.sqoop.model.MFromConfig;
+import org.apache.sqoop.model.MInput;
+import org.apache.sqoop.model.MJob;
+import org.apache.sqoop.model.MLink;
+import org.apache.sqoop.model.MLinkConfig;
+import org.apache.sqoop.model.MSubmission;
+import org.apache.sqoop.model.MToConfig;
+import org.apache.sqoop.validation.Status;
+
+/**  
+* @ClassName: SqoopTest  
+* @Description: TODO  
+* @author zyz  
+* @date 2017年11月8日 下午5:02:48  
+*   
+*/
+public class SqoopTest {
+
+	//sqoop的服务端url地址
+	private final String URL = "http://master:12000/sqoop/";
+	//创建客户端对象
+	private SqoopClient client = new SqoopClient(URL);
+	//创建一个link
+	private void createLink(){
+		//创建一个generic-jdbc-connector类型的link
+		MLink link = client.createLink("generic-jdbc-connector");
+		//link.getConnectorLinkConfig()获取的是connector的配置信息
+		link.setName("to_window_mysql");
+		MLinkConfig linkConfig = link.getConnectorLinkConfig();
+		//根据配置项名称来获取配置项
+		//取出所有的配置项
+		List<MConfig> list = linkConfig.getConfigs();
+		/*for (MConfig mConfig : list) {
+			List<MInput<?>> inputs = mConfig.getInputs();
+			for (MInput<?> mInput : inputs) {
+				System.out.println(mInput);
+			}
+		}*/
+		//MLinkconfig的相关配置项并设置相应的值
+		linkConfig.getStringInput("linkConfig.jdbcDriver").setValue("com.mysql.jdbc.Driver");
+		linkConfig.getStringInput("linkConfig.connectionString").setValue("jdbc:mysql://192.168.6.186:3306/test");
+		linkConfig.getStringInput("linkConfig.username").setValue("root");
+		linkConfig.getStringInput("linkConfig.password").setValue("root");
+		linkConfig.getStringInput("dialect.identifierEnclose").setValue(" ");
+		//保存到sqoop服务器
+		Status status = client.saveLink(link);
+		if(status.canProceed()){
+			System.out.println("创建link"+link.getName()+"成功");
+		}else{
+			System.out.println("创建link失败");
+		}
+	}
+	
+	public void createJob(){
+		MJob job = client.createJob("bd14hdfs", "to_window_mysql");
+		job.setName("towindowmysql");
+		//job.setCreationUser("root");
+		//配置fromJob
+		MFromConfig fromJobConfig = job.getFromJobConfig();
+		List<MConfig> configs = fromJobConfig.getConfigs();
+		/*for (MConfig mConfig : configs) {
+			List<MInput<?>> inputs = mConfig.getInputs();
+			for (MInput<?> mInput : inputs) {
+				System.out.println(mInput);
+			}
+		}*/
+		fromJobConfig.getStringInput("fromJobConfig.inputDirectory").setValue("/bd14/exptomysql");
+	  
+		//配置toJob
+	   MToConfig toJobConfig = job.getToJobConfig();
+	   List<MConfig> configs2 = toJobConfig.getConfigs();
+	   /*for (MConfig mConfig : configs2) {
+		List<MInput<?>> inputs = mConfig.getInputs();
+		for (MInput<?> mInput : inputs) {
+			System.out.println(mInput);
+		}
+	}*/
+	toJobConfig.getStringInput("toJobConfig.schemaName").setValue("from_java_sqoop");
+	toJobConfig.getStringInput("toJobConfig.tableName").setValue("j_user");
+	Status status = client.saveJob(job);
+	if(status.canProceed()){
+		System.out.println("成功创建"+job.getName());
+	}else{
+		System.out.println("创建失败");
+	}
+	}
+	public void startJob(){
+		MSubmission submission = client.startJob("towindowmysql");
+	}
+	public static void main(String[] args) {
+		SqoopTest sqoopTest = new SqoopTest();
+		sqoopTest.createLink();
+	    sqoopTest.createJob();
+		sqoopTest.startJob();
+	}
+
+}
+
+```
+
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510115169659.jpg
   [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510115748584.jpg
@@ -188,3 +331,6 @@ submission查看当前已提交的sqoop的导入导出任务
   [25]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510128220534.jpg
   [26]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510128240722.jpg
   [27]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510128259364.jpg
+  [28]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510148303959.jpg
+  [29]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510149486187.jpg
+  [30]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510148688521.jpg
