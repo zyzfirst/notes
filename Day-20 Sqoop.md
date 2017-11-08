@@ -97,7 +97,7 @@ job和link   是数据导入导出配置对象,过程设置在这两个对象中
 submission查看当前已提交的sqoop的导入导出任务
 
 # 创建一个job,from mysql To hdfs
-## 创建mysql的link
+## 创建mysql的link(因为sqoop会发布到yarn上运行,且只有master有mysql,所以不能使用localhost)
 
 ![标识符][13]
 
@@ -108,6 +108,57 @@ submission查看当前已提交的sqoop的导入导出任务
 
 ![流程][15]
 需要指定配置文件的目录,因为依赖hadoop的配置,所以给出的是hadoop的conf
+
+## 创建job,指定from和to
+
+![创建job][16]
+
+## 修改job update job -n jobName(因为不认识数据库hive,所以不适用schme,update下)
+**在创建link的时候已经指定hive数据库**
+
+![修改job][17]
+
+## 启动job(首先开启hadoop的history)
+>因为sqoop的任务是发布到yarn上去执行的,所以任务的进度需要查看yarn的8088端口,并且希望看到运行的日志,所以需要开启history,进入到hadoop的sbin目录下mr-jobhistory-daemon.sh start historyserver 启动history服务
+>一般查看最后一个日志syslog(系统记录)stderr(标准错误,信息不详细)
+
+![查看日志][18]
+
+![详细日志][19]
+
+- start job -n flocalmysqltobd14hdfs      开启job任务
+
+![提交到yarn][20]
+
+- status job  -n flocalmysqltobd14hdfs  查看job的状态
+
+![查看状态][21]
+
+## 因为To Hdfs,所以去查看master:50070
+
+![查看结果][22]
+
+# mysql连接不上问题,远程登录权限问题
+## 错误查找方向
+- 一运行就报错(面板报错),那么就在sqoop的@LOGDIR日志中查看原因
+
+![connector失败][23]
+
+- 成功提交到yarn上,但是task失败,查看yarn日志(不认识hive数据库,通过删除schema解决)
+
+## 远程登录权限
+- 查看user表,把其他的记录删除,只留下localhost和%
+- flush 一下,生效
+
+![解决connector][24]
+
+报错信息:
+
+![sqoop日志][25]
+
+![yarn日志][26]
+
+![正确信息][27]
 
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510115169659.jpg
@@ -125,3 +176,15 @@ submission查看当前已提交的sqoop的导入导出任务
   [13]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510117101141.jpg
   [14]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510117118041.jpg
   [15]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510117280762.jpg
+  [16]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510126780244.jpg
+  [17]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510126885796.jpg
+  [18]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510127159593.jpg
+  [19]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510127197747.jpg
+  [20]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510127402593.jpg
+  [21]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510127471495.jpg
+  [22]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510127680559.jpg
+  [23]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510127954249.jpg
+  [24]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510128160933.jpg
+  [25]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510128220534.jpg
+  [26]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510128240722.jpg
+  [27]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510128259364.jpg
