@@ -175,8 +175,380 @@ log.retention.check.interval.ms=300000
 # If log.cleaner.enable=true is set the cleaner will be enabled and individual logs can then be marked for log compaction.
 log.cleaner.enable=false
 ```
+## kafka的负载均衡
 
+kafka的负载均衡是通过partititon完成的,Producer发送消息到broker时，会根据Paritition机制选择将其存储到哪一个Partition。如果Partition机制设置合理，所有消息可以均匀分布到不同的Partition里，这样就实现了负载均衡。如果一个Topic对应一个文件，那这个文件所在的机器I/O将会成为这个Topic的性能瓶颈，而有了Partition后，不同的消息可以并行写入不同broker的不同Partition里，极大的提高了吞吐率。可以在$KAFKA_HOME/config/server.properties中通过配置项num.partitions来指定新建Topic的默认Partition数量，也可在创建Topic时通过参数指定，同时也可以在Topic创建之后通过Kafka提供的工具修改。
 
+![分区机制][15]
+
+## group
+
+同一Topic的一条消息只能被同一个Consumer Group内的一个Consumer消费，但多个Consumer Group可同时消费这一消息。
+Kafka的设计理念之一就是同时提供离线处理和实时处理。根据这一特性，可以使用Storm这种实时流处理系统对消息进行实时在线处理，同时使用Hadoop这种批处理系统进行离线处理，还可以同时将数据实时备份到另一个数据中心，只需要保证这三个操作所使用的Consumer属于不同的Consumer Group即可。
+
+![enter description here][16]
+
+![enter description here][17]
+
+![enter description here][18]
+
+offset的三个维度:
+1.所属的topic 
+2.所属的partittion
+3.consumser group名称
+4. offset的当前值,不在这里记录,不属于维度,不过这个值是可以得到的
+
+## kafka的快速查找机制
+kafka是顺序存储,所以只会是顺序扫描,所以效率低,kafka内部对文件做了分段和索引  两个工作
+
+### 数据文件的分段
+Kafka解决查询效率的手段之一是将数据文件分段，比如有100条Message，它们的offset是从0到99。假设将数据文件分成5段，第一段为0-19，第二段为20-39，以此类推，每段放在一个单独的数据文件里面，数据文件以该段中最小的offset命名。这样在查找指定offset的Message的时候，用二分查找就可以定位到该Message在哪个段中。
+
+### 为数据文件建索引
+数据文件分段使得可以在一个较小的数据文件中查找对应offset的Message了，但是这依然需要顺序扫描才能找到对应offset的Message。为了进一步提高查找的效率，Kafka为每个分段后的数据文件建立了索引文件，文件名与数据文件的名字是一样的，只是文件扩展名为.index。
+索引文件中包含若干个索引条目，每个条目表示数据文件中一条Message的索引。索引包含两个部分（均为4个字节的数字），分别为相对offset和position。
+- 相对offset：因为数据文件分段以后，每个数据文件的起始offset不为0，相对offset表示这条Message相对于其所属数据文件中最小的offset的大小。举例，分段后的一个数据文件的offset是从20开始，那么offset为25的Message在index文件中的相对offset就是25-20 = 5。存储相对offset可以减小索引文件占用的空间。
+- position，表示该条Message在数据文件中的绝对位置。只要打开文件并移动文件指针到这个position就可以读取对应的Message了。
+
+# kafka的javaAPI实现
+
+## produce的设置
+- 进入kafka官网,选择版本,选择produce的API,可以查看javadoc,也可以查看设置
+
+![produce设置][19]
+
+## 基本配置,初始化producer
+
+``` stylus
+private KafkaProducer<String, String> producer;
+	private Properties properties= new Properties();
+	public ProduceKafka(){
+		properties.put("bootstrap.servers", "master:9093");
+		properties.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+		properties.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+		producer = new KafkaProducer<>(properties);
+	}
+```
+## 发送recoder,可以指定分区,也可以不指定分区,需要创建producerrecoder对象
+
+``` stylus
+public void assignPartititonSend(String key,String value){
+		ProducerRecord<String, String> record = new ProducerRecord<>("from_java", 0, key, value);
+	    producer.send(record);
+	    
+	}
+```
+指定topic,前提是topic已经存在
+
+## 发送recoder,可以带回调函数,确保recoder已经加入topic队列
+
+``` stylus
+public void sendRecordeWithCallback(String key,String value){
+		Logger logger = LoggerFactory.getLogger(ProduceKafka.class);
+		ProducerRecord<String, String> record = new ProducerRecord<String, String>("from_java", key, value);
+		producer.send(record, new Callback() {
+			
+			@Override
+			public void onCompletion(RecordMetadata metadata, Exception exception) {
+				if(exception !=null){
+					logger.warn("服务端异常:");
+					exception.printStackTrace();
+				}else{
+				   logger.info("存储位置:partition:"+metadata.partition()+",offset:"+metadata.offset()+",ts:"+metadata.timestamp());
+				}
+			}
+		});
+	}
+```
+## 得到分区信息
+
+``` stylus
+public void getTopicPartititon(String topic){
+		List<PartitionInfo> partitionsFor = producer.partitionsFor(topic);
+		for (PartitionInfo partitionInfo : partitionsFor) {
+			System.out.println(partitionInfo);
+		}
+	}
+```
+## 得到全部produce的内部设置,存放在map中
+
+``` stylus
+public void getMetrics(){
+		//metrics状态数据
+		Map<MetricName, Metric> metrics = (Map<MetricName, Metric>) producer.metrics();
+		for (MetricName name : metrics.keySet()) {
+			System.out.println(name.name()+":"+metrics.get(name).value());
+		}
+	}
+```
+## consumer设置
+
+### 基本设置,properties和初始化consumer
+
+``` stylus
+private Properties properties = new Properties();
+	private KafkaConsumer<String, String> consumer;
+	public MenulCommitConsumer(){
+		properties.setProperty("bootstrap.servers", "master:9092");
+		properties.setProperty("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+		properties.setProperty("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+		properties.setProperty("group.id", "java_group");
+        //取消自动提交offset
+		properties.setProperty("enable.auto.commit", "false");
+		//properties.setProperty("auto.offset.reset", "none");
+		consumer = new KafkaConsumer<>(properties);
+	}
+```
+## 获取分区的offset信息
+
+``` stylus
+public void getOffset(){
+		OffsetAndMetadata offsets = consumer.committed(new TopicPartition("from_java", 0));
+	    System.out.println(offsets+":"+offsets.offset());
+	}
+```
+## 订阅topic并且poll数据
+可以设置自动提交为false,那么需要手动提交,若不提交,则会重复消费之前已经消费国的数据
+
+![同步与异步提交][20]
+
+``` stylus
+public void subscribeTopc(){
+		List<String> topic = new ArrayList<>();
+		topic.add("from_java");
+		consumer.subscribe(topic);
+		while(true){
+			ConsumerRecords<String, String> records = consumer.poll(1000);
+			for (ConsumerRecord<String,String> recoder : records) {
+				System.out.println("partition:"+recoder.partition()+"offset:"+recoder.offset()+"key:"+recoder.key()+"value:"+recoder.value());
+			}
+			//consumer.commitSync();
+		}
+```
+## 指定分区消费
+需要seek方法,参数是topicpartition,可以指定offset位置,也可以seekTobaiginning或是seekToend
+
+``` stylus
+//指定分区消费,指定从offset的值处开始消费
+	public void consumerAssignerd(){
+		
+		//指定分区
+		List<TopicPartition> partitions = new ArrayList<>();
+		partitions.add(new TopicPartition("from_java", 0));
+		consumer.assign(partitions);
+		consumer.seek(new TopicPartition("from_java", 0), 306);
+		while(true){
+			ConsumerRecords<String, String> records = consumer.poll(1000);
+			for (ConsumerRecord<String,String> recoder : records) {
+				System.out.println("partition:"+recoder.partition()+"offset:"+recoder.offset()+"key:"+recoder.key()+"value:"+recoder.value());
+			}
+		}
+		
+	}
+```
+
+## 设置从哪个offset开始pool数据,指定offset消费
+
+``` stylus
+public void setCommitOffset(){
+		Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
+		offsets.put(new TopicPartition("from_java", 0), new OffsetAndMetadata(20));
+		List<String> topics = new ArrayList<>();
+		topics.add("from_java");
+		consumer.subscribe(topics);
+		//指定位置提交某个分区的offset值,这个会在下次poll数据之前生效,所以先poll数据,然后 在设置同步提交
+		
+		while(true){
+			ConsumerRecords<String, String> records = consumer.poll(100);
+			for (ConsumerRecord<String, String> recoder : records) {
+				if(recoder.partition()==0){
+					System.out.println("partition:"+recoder.partition()+"offset:"+recoder.offset()+"key:"+recoder.key()+"value:"+recoder.value());
+				}
+			}
+			//同步提交offset
+			consumer.commitSync(offsets);
+		}
+	}
+```
+## 确保一次消费
+
+kafka的消费可能是at least once,at most once,exactonce,最少一次是处理完之后提交,最多一次是在处理数据之前commit,确切的一次是把提交offset和处理结果返回放在一个事务中,同时成功和失败,下面是流程实现
+
+``` stylus
+public void exactlyOnceCousumer(){
+		//1.配置参数
+		properties.setProperty("enable.auto.commit", "false");
+		//重设offset (offset的值需要从mysql中获取)
+		//3.从mysql中获取person topic每个分区的offse值,使用:consumer.commitSync(offsets),提交到kafka服务器上
+		
+		//4.或者使用:consumer.seek(new TopicPartititon("from_java",0),305)
+		//来指定要从kafka中高消费数据的初始位置
+		
+		//2.订阅主题或分区
+		//consumer.subscribe(topics)
+		
+		//5.poll数据
+		//recorders=consumer.poll(1000)
+		
+		//6.遍历数据进行分析计算
+		
+		//7.计算结束之后使用consumer.committed(new TopicPartition("from_java",0))
+		//获取当前以消费的offset值
+		
+		//8.把计算结果和offset值,以原子操作(事务)的形式保存到mysql数据库(hbase mysql zookeeper 能保证是原子操作)
+		
+		//9.重新调5步循环执行,进行下一次pool和下一次计算
+	}
+```
+## kafka非结构化数据的同步
+
+![非结构化数据同步][21]
+
+flume可以同步结构化数据,例如文本,而kafka可以同步视频图片等,用字节流读取和写即可
+
+### 读文件,并且创建producer,加入topic
+
+``` stylus
+package com.zhiyou.kafka;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.util.Properties;
+
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.utils.Bytes;
+
+/**  
+* @ClassName: FileCopy  
+* @Description: TODO  
+* @author zyz  
+* @date 2017年11月10日 下午7:43:56  
+*   
+*/
+public class FileCopy {
+	
+	private Properties properties = new Properties();
+	private KafkaProducer<String, Bytes> producer;
+
+	public FileCopy() {
+		properties.setProperty("bootstrap.servers", "master:9092");
+		properties.setProperty("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+		properties.setProperty("value.serializer", "org.apache.kafka.common.serialization.BytesSerializer");
+        producer=new KafkaProducer<>(properties);		
+	}
+
+	public void sendRecoderOnePartition(String key,byte[] value){
+		ProducerRecord<String, Bytes> record = new ProducerRecord<>("file-copy", 0, key, new Bytes(value));
+		producer.send(record);
+	}
+	public void close(){
+		producer.close();
+	}
+	
+	public static void main(String[] args) throws Exception {
+		FileCopy fileCopy = new FileCopy();
+		FileInputStream input = new FileInputStream(new File("F:/pic/1.bmp"));
+		byte[] b = new byte[50*1024]; 
+		int len =0;
+		while((len=input.read(b))!=-1){
+			fileCopy.sendRecoderOnePartition("a", b);
+		}
+		
+	}
+
+}
+
+```
+### 创建consumer,poll完数据写入到文件
+
+``` stylus
+package com.zhiyou.kafka;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.utils.Bytes;
+
+/**  
+* @ClassName: FileCopyTwo  
+* @Description: TODO  
+* @author zyz  
+* @date 2017年11月10日 下午8:18:55  
+*   
+*/
+public class FileCopyTwo {
+	private Properties properties = new Properties();
+	private KafkaConsumer<String, Bytes> consumer;
+	private FileOutputStream ouput;
+
+	public FileCopyTwo() {
+		properties.setProperty("bootstrap.servers", "master:9092");
+		properties.setProperty("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+		properties.setProperty("value.deserializer", "org.apache.kafka.common.serialization.BytesDeserializer");
+		properties.setProperty("group.id", "copy-win");
+		consumer = new KafkaConsumer<>(properties);
+		
+	}
+	public void subscribe(String fileName){
+		List<String> topics = new ArrayList<>();
+		topics.add("file-copy");
+		consumer.subscribe(topics);
+		while(true){
+			ConsumerRecords<String, Bytes> records = consumer.poll(1000);
+			for (ConsumerRecord<String,Bytes> recoder : records) {
+				try {
+					writeFile(fileName, recoder.value().get());
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+			
+		}
+	}
+	public void writeFile(String fileName,byte[] b) throws Exception{
+		ouput = new FileOutputStream(new File(fileName));
+		int len = b.length;
+		ouput.write(b,0,len);
+	}
+	public static void main(String[] args) {
+		FileCopyTwo fileCopyTwo = new FileCopyTwo();
+		fileCopyTwo.subscribe("F:/2.bmp");
+	}
+
+}
+
+```
+# 出现的问题
+
+## 日志报错,没有日志信息
+>原因是这里支持的sfl4j,而不是log4j,所以我们倒过来的log4的配置起不上作用,需要导入一个转换包
+
+![日志转换][22]
+
+## 指定分区模式重复
+
+![错误截图][23]
+
+![原因截图][24]
+
+## 指定offset消费,需要先poll数据,再决定是否手动提交offset,没有poll导数据,是不能commit
+
+![错误信息][25]
+
+![解决办法][26]
+
+## 小结
+- producer: **produce的提交需要创建produceRecoder,可以指定分区导入数据,方法是send(recoder)方法,可以带回调函数**
+- consumer: **consumer需要先订阅topic或者seek(topicPartition),然后在让consumer去poll数据,之后可以设置comsumer去commit()或者指定offset的提交commit(offset)**
 
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510227679429.jpg
@@ -193,3 +565,15 @@ log.cleaner.enable=false
   [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510243562429.jpg
   [13]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510327714466.jpg
   [14]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510328162305.jpg
+  [15]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510362243050.jpg
+  [16]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510363009405.jpg
+  [17]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510363021875.jpg
+  [18]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510363037238.jpg
+  [19]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510365811800.jpg
+  [20]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510383770667.jpg
+  [21]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510382897662.jpg
+  [22]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510383692231.jpg
+  [23]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510383813420.jpg
+  [24]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510383826891.jpg
+  [25]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510383988988.jpg
+  [26]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510384056588.jpg
