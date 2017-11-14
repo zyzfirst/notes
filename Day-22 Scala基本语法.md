@@ -243,6 +243,170 @@ var times = args(0).toInt
 
 java中没有返回值的方法的类型是void,scala中没有返回值,使用的是unit,它对应的是无值
 
+## break跳出循环(return 跳出所有循环)
+
+``` stylus
+val loop = new Breaks;
+    //在它的方法中写for循环即可break
+    loop.breakable(
+      for (i <- 1 to times) {
+        if (i == 5) loop.break() else println(i)
+      }
+    )
+```
+终止循环:在scala中没有break和continue,但是可以使用scala中提供的特殊类型Breaks来实现break    也可以使用return终止整个函数的方式终止循环
+
+## 函数的声明和字面量
+
+### val futest:(Int,Int)=>Int =(x,y)=>x+y
+
+>把函数定义成变量的形式,可以作为一个参数或者对象,传到下一个方法或是函数中,这种定义方法是先定义函数类型,再定义函数的字面量   即 def 函数名:函数类型=字面量
+
+>其中**函数类型是:输入=>输出**   **字面量:参数=>函数体**    函数类型的定义相当于变量的定义  变量名:类型(不同与java)
+
+### val funcationTest = (x:Int,y:Int)=>x+y
+
+>定义成变量的简写形式,把字面量和函数类型放在一块定义,所以变量名=(类型+量)=>函数体
+
+>**val定义的不同是=号的位置**
+
+### def fuctiontest1(x:Int,y:Int)={x+y}
+
+>定义成函数,不是变量,此方法只能调用,即传参数获得计算结果,不能引用此对象(函数就是一个对象),类似java的方法的定义 只是多了=号,因为在scala中,每个函数都是对象,所以需要给对象初始化值
+
+### def functiontest2(x:Int,y:Int){x+y}
+
+>这样定义的是一个过程函数,没有返回值,或者可以说返回值是Unit类型,在函数体中写return也不会返回想要的数值,一般不怎么用
+
+## 函数被当做参数传到其他函数
+
+>参数位置写:参数名:类型         若是传函数   即参数名(随便写):Int=>Int(类型,输入类型=>输出类型)  如果输入类型只有一个,那么可以省略(),若有多个必须有()  函数可以有多个输入,但只有一个输出类型
+
+``` stylus
+def caculateArea(x:Int,f:(Int)=>Double) ={
+    f(x)
+  }
+```
+## 函数类型的参数的传参
+
+- 如果定义了函数,那么直接把函数传递过来即可
+- 如果没有定义,那么就直接定义,直接定义字面量就可以了
+
+``` stylus
+  //对外提供万能的计算公式,传递参数一个函数,函数可以作为一个参数传递过来
+    caculateArea(4,x=>{
+      println(s"等边三角形面颊:${x*x*scala.math.sqrt(3)/4}")
+      x*x*scala.math.sqrt(3)/4
+    })
+```
+## array的声明和字面量
+
+array是元素可变,长度不可变的,一旦定义,长度不变
+
+>定义方式有两种,一种是直接赋值,一种是指定array的类型和长度,以及array的三种遍历数组的方式,filter的过滤会留下返回值为true的值,取出返回为false的值,exites方法,只要存在一个就返回true
+
+``` stylus
+//数组的声明和字面量写法
+    val array = Array(1,2,3,4)
+	//数组的非字面量声明
+    val array1 = new Array[String](5)
+	 println(array1.mkString(","))
+	 
+	   //数组的遍历 until表示娶不到,to 可以取到
+    for(i<-0 until array.length){
+      println(array(i))
+    }
+    for (i<-array){
+      println(i)
+    }
+
+    array.foreach(x=>{
+      println(x)
+    })
+	//冒泡排序 顺序
+
+   def bubbleSort(array:Array[Int])={
+      for (i<-0 until array.length-1;j<-0 until array.length-i-1){
+        if(array(j)>array(j+1)){
+          val tmp = array(j)
+          array(j)=array(j+1)
+          array(j+1)=tmp
+        }
+      }
+    }
+
+    //选择排序算法,顺序排序
+    def selectSort(array:Array[Int]) ={
+      for (i<-0 until array.length-1;j<-1+i until array.length){
+        if(array(i)>array(j)){
+          val tmp = array(i)
+          array(i) = array(j)
+          array(j) = tmp
+        }
+      }
+      array
+    }
+	//过滤元素字符串中包含a的所有元素
+    val fruits = Array("sfaa","jieug","jfha","gfjs")
+    val noAFruits = fruits.filter(x=>(!x.contains("a")))
+    println(noAFruits.mkString(","))
+
+    //判断fruits中是否包含长度为5 的水果
+    val is5Length = fruits.exists(x=>x.length==5)
+    println(is5Length)
+```
+## arraybuffer
+
+>ArrayBuffer是不定长的数组,在定义的时候可以不指定长度,并且长度也可以在定义后随着元素的变化而随意增长和减小
+
+``` stylus
+ //ArrayBuffer 的声明和字面量
+    val ab1 = new ArrayBuffer[Int](2)
+    val ab2 = new ArrayBuffer[String]()
+    val ab3 = ArrayBuffer(1,2,3,4)
+	 //新增数据到arraybuffer中,+= 或者-= 才是在原来的arraybuffer上进行的操作,不带=号会生成新的
+   //根据equals方法来判断是不是含有-的值
+    ab2 += "sss"
+    ab2 += "sssgg"
+	//+:数组  会加在数组前边一个字符串
+	println("cc" +:ab2)
+	//插入数据到指定位置
+    //如果写入的起始位置超出arraybuffer中的现有index值的话会报错
+    ab2.insert(0,"fsdf","qq")
+    ab2.insert(2,"fsdf","qq")
+    println(ab2)
+	
+	 //删除某个位置 或者某个位置删除几个,不指定长度删除一个
+    ab2.remove(2,2)
+    ab2.remove(2)
+    println(ab2)
+	
+	//drop方法也是删除arraybuffer中的数据,不过会返回新数组,不是修改元数组
+    print(ab2.drop(1)) //从左往右删除
+    print(ab2.dropRight(1)) //从右往左删除
+    println(ab2)
+	
+	//更新某位置出的数据,ji 修改,原来的会替换成现在的
+    ab2.update(0,"wwwww")
+    println(ab2)
+	
+	//返回一个新的arraybuffer ,只留下偶数
+    val ab4 = ArrayBuffer(1,2,3,4,5,6,7,8,9)
+    val result1 = ab4.filter(x=>x%2==0)
+    println(result1)
+	
+	//定义一个函数,接收一个arraybuffer,和一个函数,定义的函数对每一个arraybufer中的值进行
+    //计算,返回true 则保留元素,否则删除元素
+    def removeBy(ab:ArrayBuffer[Int],f:Int=>Boolean)={
+      //对ab遍历
+      for(item <-ab){
+        if(!f(item))ab -= item
+      }
+    }
+```
+
+
+
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510577589086.jpg
   [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510577762910.jpg
