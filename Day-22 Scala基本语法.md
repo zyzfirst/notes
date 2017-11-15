@@ -404,6 +404,437 @@ array是元素可变,长度不可变的,一旦定义,长度不变
       }
     }
 ```
+## List
+
+>list是不可变的元素列表,元素不可变,长度也不可改变,如果添加元素或删除元素,会返回新的list
+
+### list的声明,字面量,添加元素,与取值
+
+``` stylus
+//list的声明和字面量
+    val list = List(1,2,3,4)
+    val list1 = List()
+    println(list)
+    println(list1)
+    println(list(0))
+    //list元素对象不可更改,不能重新赋值
+   //list(0)=100
+
+    //添加元素,形成新的list,都是返回新的list对象
+    println(list.::(22))
+    println(33::list)
+    println(33::44::list)
+    //:+向后追加
+    println(list.:+(99))
+    //+; 向前追加
+    println(88+:list)
+    println(77+:88+:list)
+    //两个list合并
+    println(list:::list)
+    println(list++list++list)
+```
+### list 常用的函数
+
+``` stylus
+//count函数的应用
+    val list2 = List(1,2,3,4,5,6,7,8,11,55,88,55,66,77,2,445,55,5,4,45,8,5,52,85,5,5)
+    val bt5Sum = list2.count(x=>x>5)
+    println(bt5Sum)
+
+    //判断list2是否以7,8 结尾
+    val isEnd78 = list2.endsWith(List(6,7))
+    println(s"list${if(isEnd78)"是"else "不是"}")
+
+    //find: 返回list中第一个满足查询条件的元素,并用option封装
+    //找出list中第一个大于4并且是偶数的  会返回一个some类型的值,如果没有返回none
+    val result = list2.find(x=>x>4&&x%2==0)
+    println(result)
+
+    val list3 = List("hadoop is good","spark is better" , "sql is best")
+    //把list3中的每一个元素各自拆分成另一个单词一个元素list
+    //flatmap 是一个战平操作,类似hive中的explore 接受一个函数,函数输入是一个元素,输出是一个集合
+    val flatList = list3.flatMap(x => x.split("\\s"))
+    println(flatList)
+
+    //reduce fold  aggreate用来做聚合  科利华(分组)颗粒化
+    val resultR = list2.reduce((x1,x2)=>x1+x2)
+    println(resultR)
+
+    //reduce 可以做聚合,可以求最大值最小值,底层是迭代计算,可以是加和,也可以是单纯返回自己本身的元素
+    val maxR= list2.reduce((x1,x2)=>if(x1>x2)x1 else x2)
+    println(s"最大值为$maxR")
+
+    //fold[A1 >: A](z: A1)(op: (A1, A1) ⇒ A1): A1
+    //z  最好不要影响聚合计算,求和是0求积是1,字符串拼接是""  op是一个函数满足自己的需求
+    val sumFold = list2.fold(0)((x1,x2)=>x1+x2)
+    println(sumFold)
+
+    //把list2中的元素聚合成字符串,字符串中包含每一个元素
+    val addStr = list2.foldLeft("")((c,x)=>s"$c${if(c=="")"" else ","}$x")
+    println(addStr)
+
+    //(B)(f1,f2) 一个初始值,两个函数,一个定义规则,一个是聚合(分区规则不清楚)
+    val strAggrate = list2.aggregate("")(
+      (c,x)=>s"$c${if(c=="")"" else ","}$x",  //seqop 每个分区的聚合操作
+      (c1,c2)=>s"$c1,$c2"   //每个区已经聚合好的,在次聚合
+    )
+println(strAggrate)
+
+    val sumAggregate = list2.aggregate(0)(
+      (c,x)=>c+x,
+      (c1,c2)=>c2+c1
+    )
+    println(sumAggregate)
+
+    //nil 代表一个空的list
+    val list4 = "a"::"b"::"v"::Nil
+    println(list4)
+
+    //获取左边第一个元素,迭代操作会用到
+    println(list4.head)
+    //获取除去第一个元素
+    println(list4.tail)
+    //获取右边第一个
+    println(list4.last)
+    //获取除去右边第一个
+    println(list4.init)
+
+    //把list按照奇偶分组
+    val groups = list2.groupBy(x=>if(x%2==0)"偶数" else "奇数")
+    println(groups)
+
+    //zip拉链操作,把两个list组合起来,当元素数量不一致时,会按照元素小的为准,少的元素没有了就不匹配了
+    println(list2.zip(list4))
+
+    //map 方法把list或是map 通过某种规则构建一个新的collection
+    //把list的每一个元素转换成字符传返回一个新的list,没个元素都是string类型
+    val list5 = list2.map(x=>x.toString)
+    println(list5)
+```
+### java List 的定义
+
+``` stylus
+//定义一个java  list对象
+    val list6 = new util.ArrayList[String]()
+    list6.add("122")
+    list6.add("123")
+    println(list6)
+```
+### listBuffer 是可变长的
+
+``` stylus
+//listBuffer 声明,字面量,取值,改值
+    //listBuffer 是可变长的类型
+    val mList = ListBuffer(1,2,3,4)
+    mList(0)=100
+    println(mList)
+    mList.insert(0,11)
+    println(mList)
+    mList.update(0,100)
+    println(mList)
+    mList.remove(3)
+    println(mList)
+```
+## def val lazy 定义变量的区别
+- def: def修饰符修饰的变量,声明赋值时不会马上执行,在每次调用变量的时候会重新计算
+- val:  在赋值声明完成后,就会进行计算并完成赋值,不管声明 的变量有木有使用,并且不会重复计算
+- lazy: lazy val 的形式,跟val类似,不会重复计算,不过是在调用变量的时候才会完成计算并赋值的过程
+
+``` stylus
+ //val 类型的变量,在声明的时候就会把右边表达式的结果计算出来,然后赋值给result
+    //一旦赋值,右边的表达式就不再计算
+    val result = sumInt(4,5)
+    println("定义完成")
+    println(result)
+    println(s"第二次$result")
+    //def 类型的变量,在声明赋值的时候,右边的表达式不会马上执行
+    //def 变量每一次被调用的时候,等号右边的表达式都会被重新计算一次
+    def d = sumInt(2,3)
+    println(s"变量已经定义了")
+    println(s"第一次打印$result")
+    println(s"第二次打印$result")
+    //lazy定义的变量,在声明赋值时,等号右边的表达式不会马上执行
+    //在lazy对象第一次调用的时候会被计算一次,并赋值给lazy对象,后续再次调用,表达式不在计算
+    lazy val l = sumInt(1,9)
+    println("定义完成")
+    println(s"第一个$l")
+    println(s"第二次$l")
+```
+## Set  无序,不重复
+>set是长度可变,并且set是无序,不重复的,在定义的时候如果有重复的元素,会自动筛选掉,无序指的是定义顺序和存储顺序是不固定的,一旦存储顺序也就固定了,他不能根据索引来取值
+>**set名字是重复的,有可变的set,也有不可变的set,默认不指定包的话,是不可变的set,如果想用可变的呃set,需要指定是mutable包写的set,他们的声明方式一样,并且大部分方法也是一样的,个别有不同**
+
+``` stylus
+//set的声明和字面量,无序,不重复
+    val set1 = Set(1,2,3,4,1,5,2)
+    println(set1)
+    //返回false,因此set无序不重复,不能用位置来获取元素
+    println(set1(0)) //会返回false
+    for(i<-set1)print(i)
+    println("---")
+    set1.foreach(x=>{print(x)})
+
+    //head tail
+    //init last
+    //可变的set
+    val mSet = scala.collection.mutable.Set(1,2,3,8,9,5)
+    mSet.add(4554)
+    println(mSet)
+    mSet += 66
+    println(mSet)
+    //remove 根据对象来删除,不能根据位置
+    mSet.remove(1)
+    println(mSet)
+```
+## map 相当于只有两个元素的元组
+### 默认是不可变的map
+#### map的声明 字面量 与取值
+
+``` stylus
+ //map 声明,字面量 ,取值
+    val map1 = Map(1->"a",2->"b",3->"c")
+    println(map1)
+    val map2 = Map((1,"a"),(2,"b"))
+    println(map2)
+    println(map1(2))
+    val map3 = Map("a"->1,"b"->2)
+    println(map3)
+
+    //map遍历
+    map1.foreach(
+      x=>println(s"key:${x._1},value:${x._2}")
+    )
+    println("----")
+    for(x<-map2){
+      println(s"key:${x._1},value:${x._2}")
+    }
+    println("----")
+    for((k,v)<-map3){
+      println(s"key:${k},vlaue:${v}")
+    }
+    println("----")
+    for(ks<-map1.keySet){
+      println(s"key:${ks},vlaue:${map1(ks)}")
+    }
+
+    //不可变map  不可重新给元素赋值
+    //map1("q")=55
+
+    //get 方法,获取指定key的value值
+    val map4 = Map("zyz"->18,"wxx"->99,"fff"->66)
+    println(map4.get("zyz"))
+    println(map4("zyz"))
+    //用()来获取元素,若没有key,那么会抛异常
+    //println(map4("zyzh"))
+    //get方法健壮性更强
+    println(map4.get("hzyz"))
+
+    //map ++
+    println(map1 ++ map2)
+    println(map1 ++ Map("gg"->88))
+```
+#### 不可变map的常用方法
+
+##### count(有条件的计算个数或这数量)
+
+``` stylus
+//count
+    val map5 = Map("apple"->5,"pear"->4,"tomato"->6,"banana"->9,"att"->6)
+    //计算出value道标key长读的map
+    val count = map5.count(x=>x._1.length==x._2)
+    println(count)
+    //计算key的长度为5的个数
+    val count1 = map5.count(x=>x._1.length==5)
+```
+##### filter 过滤操作把原集合根据条件过滤掉一部分
+
+``` stylus
+//filter 过滤(集合)
+    val fil1 = map5.filter(x=>x._1.length>5)
+    println(fil1)
+    println(map5.filter(x=>x._1.contains("t")&&x._2==6))
+    println(map5.filterKeys(x=>x.length<6))
+```
+##### flatMap  展平操作,只能一级展平(split->list)(value->map)
+
+``` stylus
+//flatMap 展平map
+    val map6 = Map("a"->List(1,2,3,5),"b"->List(7,8,9))
+    val flatMap1 = map6.flatMap(x=>x._2)
+    println(flatMap1)
+    val map7 = Map("a"->List("1"->2,"2"->List(11,22),"zy","ii5"),"b"->List("k7","lo","9p"))
+    println(map7.flatMap(x=>x._2))
+	
+	 val list3 = List("hadoop is good","spark is better" , "sql is best")
+    //把list3中的每一个元素各自拆分成另一个单词一个元素list
+    //flatmap 是一个战平操作,类似hive中的explore 接受一个函数,函数输入是一个元素,输出是一个集合
+    val flatList = list3.flatMap(x => x.split("\\s"))
+    println(flatList)
+```
+##### groupBy 根据函数的返回值结果进行分组(true-false)(给定的任意返回值) 相同的合成一个map
+
+``` stylus
+//groupBy  map的嵌套
+    println(map5.groupBy(x=>x._2))
+    val group1 = map5.groupBy(x=>x._1.startsWith("a"))
+    println(group1)
+    //按照姓氏分组   按照返回的值进行分组,上边按照false和true分组
+    val group2 = map5.groupBy(x=>x._1.split(" ")(0))
+```
+
+##### map 对原collection进行加工,返回新的目标collection(list,map取决于自行定义的function)
+
+``` stylus
+//map 方法,对kv对  进行映射转换,key 和value 必须都的返回,都是返回新的map
+    val map8 = Map("校长"->3000,"小智"->700,"PDD"->1400)
+    //每个人工资加500
+    println(map8.map(x=>(x._1,x._2+500)))
+    //若只对value处理可以使用mapvalues
+    println(map8.mapValues(x=>x+1000))
+    //工资大于1000 是高收入,为她们呢的姓名打上标签
+    val result = map8.map(x=>(if(x._2>1000)s"[高收入]${x._1},${x._2}"else s"[低收入]${x._1},${x._2}"))
+    //val result = map8.map(x=>((if(x._2>1000)s"[高收入]${x._1}"else s"[低收入]${x._1}"),x._2))
+    //val reuslt = map8.map(x=>((s"${if(x._2>10000)"[高收入]" else "[低收入]"}${x._1}"),x._2))
+```
+![list][9]
+
+![map][10]
+
+##### 聚合 reduce,fold,foldLeft,Aggregate
+
+``` stylus
+//reduce 聚合
+    //把map8中所有的value加起来
+    val salaryMonth = map8.reduce((x1,x2)=>{
+      ("月指出",x1._2+x2._2)
+    })
+    println(salaryMonth)
+    //fold
+    val salaryFold = map8.fold(("月指出",0))((c,x)=>(c._1,c._2+x._2))
+    val salaryFoldLeft = map8.foldLeft(0)((c,x)=>c+x._2)
+    val salaryAggregate = map8.aggregate(0)(
+      (c,x)=>c+x._2,
+      (c1,c2)=>c1+c2
+    )
+    println(salaryFold)
+    println(salaryFoldLeft)
+    println(salaryAggregate)
+```
+##### 最大值最小值等
+
+``` stylus
+//key 最大最小值
+    println(s"map1的最大值:${map1.max}")
+    println(s"map1的最小值:${map1.min}")
+    //根据工资返回最大值最小值,指定根据key还是value
+    println(s"map1的最大值:${map8.maxBy(x=>x._2)}")
+    println(s"map1的最小值:${map8.minBy(x=>x._2)}")
+
+    //先将kv变换位置在进行最大值判断
+    val maxSalary = map8.map(x=>(x._2,x._1)).max
+    println(maxSalary)
+	
+	//判断map4中,是否包含key:"zang",判断的仅仅是key
+    println(map4.contains("zyz"))
+	
+	//drop删除  参数是删除的个数,并不是索引,不是指定位置删除,而是指定个数删除,不可变返回的是新map
+    println(map5)
+    println(map5.drop(2))
+    println(map5.dropRight(2))
+```
+### 可变map的声明,字面量
+
+``` stylus
+/可变map的声明定义
+    val mmap1 =scala.collection.mutable.Map(1->"a",2->"c")
+    println(mmap1)
+    println(mmap1(1))
+    println(mmap1.get(1))
+
+    //put(key,value)
+    mmap1.put(3,"v")
+    //指定key来删除
+    mmap1.remove(3)
+    //+= 一个或多个 逗号隔开
+    mmap1 += (4->"p",5->"tt")
+    mmap1 += ((4,"p"),7->"dd")
+    mmap1.update(2,"update")
+    println(mmap1)
+```
+
+## 元组Tuple ,元素的类型可以不一致,并且属于不可变的,没在collection包下,不属于集合,不能foreach遍历去元素,只能通过 下划线索引来取值
+>功能就是可以在函数方法中使用元组,返回多个结果,再通过下划线取值
+
+``` stylus
+//元组的声明,字面量,取值
+    val tuple = (1,2,"a",3.0,123.000,true)
+    val tuple1 = (1,"王思聪","男",3.0,123.000,true)
+    val pairTuple = ("a",1) //等同于map,map就是只有两个值的元祖
+    println(tuple)
+    println(tuple1)
+    println(pairTuple)
+
+    //取值
+    println(tuple._6)
+    //元组也是不可变的,定义之后不能发生改变
+    //tuple._6=false
+
+    //元组可以进行多个变量定义和赋值(变量和元组的元素个数要一致,否则报错)
+    val list = List(1,2,3)
+   // val (one,two,three)= (list(0),list(1),list(2))
+    val tutu = (1,"d",true)
+    val (one,two,three)= tutu
+    println(one)
+    println(two)
+    println(three)
+
+    //集合类型都有泛型,都是集合,可以foreach循环
+    /*for(i<-tuple){
+      println(i)
+    }*/
+
+    //变量定义,计算,封装类型(可以让方法返回多个值)
+    val tupleResult = tupleTest1("p666")
+    println(tupleResult)
+  }
+  def tupleTest1(a:String)={
+    val value1 = s"return value1${a}"
+    val value2 = s"return value2$a"
+    val value3 = s"return value3$a"
+    val value4 = s"return value4$a"
+    (value1,value2,value3,value4)
+  }
+```
+## Option类 是用来封装其他类型的对象(相当于容器Option[Int]),一般应用于方法的返回值上,以避免方法返回值为空带来的问题   它的子类可以有(None==代表没有返回值)(Some==封装了返回值)
+
+``` stylus
+def main(args: Array[String]): Unit = {
+    //option some none
+    val value1 = optionT(4)
+    val value2 = optionT(-5)
+    //返回some(4)
+    println(value1)
+    //返回none
+    println(value2)
+    //得到4
+    println(value1.get)
+    //如果为none 还是用get方法就会抛异常,.NoSuchElementException
+    println(value2.get)
+
+    //用途,用来初始化一个值,he match 一块使用  判断是否为null
+    val value3 = optionT(-5)
+    //先判断value3是否为空,若为空返回0,若不为空,返回自身的值
+    println(value3.getOrElse(0))
+    //some 可以封装任意类型,一般用于函数返回值上
+    val some1 = Some("fff")
+    val some2 = Some(4)
+    println(some1)
+    println(some2)
+  }
+  def optionT(x:Int):Option[Int]={
+    if(x>0) Some(x) else  None
+  }
+```
 
 
 
@@ -416,3 +847,5 @@ array是元素可变,长度不可变的,一旦定义,长度不变
   [6]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510578725733.jpg
   [7]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510581290857.jpg
   [8]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510582295531.jpg
+  [9]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510758621325.jpg
+  [10]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1510758726019.jpg
