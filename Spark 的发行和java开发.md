@@ -40,15 +40,17 @@ grammar_cjkRuby: true
 
 ![yarn模式][2]
 
+![整体结构][3]
+
 ### client模式
 
-![client][3]
+![client][4]
 
 **Client和Driver运行在一起，AM只用来获取资源,驱动程序driver运行在client中,即submit的节点的上,AM只是来请求获取yarn的资源**
 
 ### cluster模式
 
-![cluster][4]
+![cluster][5]
 
 **Driver和AM运行在一起,可以说是driver嵌套在AM中,相当于驱动程序跑在AM的一个县城中,在初始化完成后client会消失,即client的请求被响应,创建AM并启动driver,driver并不在submit的节点上,去master:8088  yarn的application的运行轻卡un个上查看任务进度**
 
@@ -58,7 +60,7 @@ grammar_cjkRuby: true
  
  ## 报错
  
- ![yarn模式client][5]
+ ![yarn模式client][6]
  
  是虚拟内存不足引起的
  
@@ -170,6 +172,7 @@ public class SparkTest {
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1511446889721.jpg
   [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1511447322167.jpg
-  [3]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1511447510041.jpg
-  [4]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1511447658386.jpg
-  [5]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1511449260972.jpg
+  [3]: https://markdown.xiaoshujiang.com/img/spinner.gif "[[[1511449527632]]]"
+  [4]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1511447510041.jpg
+  [5]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1511447658386.jpg
+  [6]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1511449260972.jpg
