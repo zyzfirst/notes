@@ -56,6 +56,27 @@ grammar_cjkRuby: true
 
  ./mr-jobhistory-daemon.sh start historyserver
  
+ ## 报错
+ 
+ ![yarn模式client][5]
+ 
+ 是虚拟内存不足引起的
+ 
+ 在yarn-site.xml中增加配置,拷贝到各个节点就可以解决了
+ 
+
+``` stylus
+<property>
+    <name>yarn.nodemanager.vmem-check-enabled</name>
+    <value>false<alue>
+    </description>
+</property>
+
+```
+
+
+
+ 
  
  # mapreduce任务的发行
  
@@ -151,3 +172,4 @@ public class SparkTest {
   [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1511447322167.jpg
   [3]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1511447510041.jpg
   [4]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1511447658386.jpg
+  [5]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1511449260972.jpg
