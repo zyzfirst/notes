@@ -630,6 +630,13 @@ describe formatted compress_order
 
 ![][12]
 
+## 出错
+
+![job in use][13]
+
+错误信息,job in use   提示job一致在占用,无法删除,因为没有启动jobhistoryserver服务
+
+
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508854268069.jpg
   [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508858163433.jpg
@@ -643,3 +650,4 @@ describe formatted compress_order
   [10]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508939850153.jpg
   [11]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508940892389.jpg
   [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1509024996374.jpg
+  [13]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1512141725172.jpg
