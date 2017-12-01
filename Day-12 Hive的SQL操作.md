@@ -635,7 +635,7 @@ describe formatted compress_order
 ![job in use][13]
 
 错误信息,job in use   提示job一致在占用,无法删除,因为没有启动jobhistoryserver服务
-
+在运行job时,applicationmaster会将mr的job根据mapered-site.xml中的配置,将jobhistory的信息保存到hdfs上,当父进程检索到hdfs上的信息时,会将内存释放,job任务完成,若是检索不到信息,那么job的进程就会一直在后天运行
 
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1508854268069.jpg
