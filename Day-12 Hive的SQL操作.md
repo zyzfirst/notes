@@ -591,6 +591,7 @@ describe formatted p_orders
 **分桶表需要先开启配置分桶,然后指定分几个桶,会自动计算从哪个桶取数据,效率更高**
 
 ``` stylus
+--set hive.enforce.bucketing = true;   开启分桶
 -- 分桶,数据量不大,但是经常查询
 create table pb_orders(
   order_id int 
