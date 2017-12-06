@@ -255,7 +255,9 @@ public class BIApplication extends SpringBootServletInitializer{
 - model的实体类,在domain包下,官方指定
 - 使用的是动态代理技术,dao层的实现类不用自己写,而由class main 加载加来
 
+### 在domain中实体类中 自动生成set,get,tostring方法
 
+![enter description here][12]
 
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1512552731855.jpg
@@ -269,3 +271,4 @@ public class BIApplication extends SpringBootServletInitializer{
   [9]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1512563582142.jpg
   [10]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1512564092376.jpg
   [11]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1512564137485.jpg
+  [12]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1512566219329.jpg
