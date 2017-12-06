@@ -238,6 +238,8 @@ jsp需要servlet的支持,并且比较麻烦,一般官方不推荐使用jsp
 ### 需要有一个继承SpringBootServletInitializer的类指明去加载这个类
 某个类找不到,或是配置文件加载不到,可以尝试使用这个类run一下,加载进来
 
+**这个类是spring boot 的入口,需要先启动,相当于发布项目,然后用plugin的spring boot run 来运行application,开启服务,eclipse里边是一件发布加运行**
+
 ``` stylus
 @MapperScan("com.zhiyou.bi.dao")
 @SpringBootApplication
@@ -263,6 +265,9 @@ public class BIApplication extends SpringBootServletInitializer{
 
 #配置mapper文件的位置
 mybatis.mapper-locations=classpath:/mapper/*Mapper.xml
+
+
+
 
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1512552731855.jpg
