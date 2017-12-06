@@ -259,6 +259,11 @@ public class BIApplication extends SpringBootServletInitializer{
 
 ![enter description here][12]
 
+配置连接数据库的jdbc  ,关键字是  datasource
+
+#配置mapper文件的位置
+mybatis.mapper-locations=classpath:/mapper/*Mapper.xml
+
 
   [1]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1512552731855.jpg
   [2]: https://www.github.com/zyzfirst/note_images/raw/master/%E5%B0%8F%E4%B9%A6%E5%8C%A0/1512555917431.jpg
