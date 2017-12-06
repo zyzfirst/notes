@@ -81,9 +81,9 @@ bootstrap 的面板,可以将页面分成上下或是左右,把内容写在div�
 ## echarts的使用
 
 - 定义一个div有大小的div,使用id起一个名字
-- 定义一个图表对象
-- 定义图标的参数
-- 对象把参数导入图表
+- 定义一个图表对象,把预留的div 加载进来 var echartobj =echarts.init(doument.getElementById("main"));
+- 定义图标的参数 var option = {};
+- 对象把参数导入图表 echartobj.setoption(option); 把参数记载进来
 
 ![echart使用流程][4]
 
